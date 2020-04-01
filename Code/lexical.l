@@ -15,20 +15,19 @@
 
 wc          [ \r\t]*
 int         ([1-9][0-9]*)|(0[xX][0-9a-fA-F]+)|(0[0-7]*)
-float       ((([1-9][0-9]*)|0)\.([0-9]+))|((([1-9][0-9]*)|0)?\.([0-9]+)(e[+-]?[0-9]*))|((([1-9][0-9]*)|0)(\.)?([0-9]+)?(e[+-]?[0-9]*))
+float       ((([1-9][0-9]*)|0)\.([0-9]+))|((([1-9][0-9]*)|0)?\.([0-9]+)([eE][+-]?[0-9]*))|((([1-9][0-9]*)|0)(\.)?([0-9]+)?([eE][+-]?[0-9]*))
 id          [a-zA-Z_][a-zA-Z_0-9]*
 comment1    \/\/.*\n
 comment2    \/\*
 
 %%
-
 "\n"    { yycolumn = 1;}
 {wc}    {   }
 {comment1} {}
 {comment2} {
     char c1, c2;
     int comflag = 0;
-    while (c1 = input()) {
+    while ((c1 = input()) > 0) {
         if (c1 == '*') {
             c2 = input();
             if (c2 == '/') {
@@ -38,7 +37,7 @@ comment2    \/\*
             else unput(c2);
         }
     }
-    if (!comflag) fprintf(stderr, "\033[31mError type A at Line %d: Unterminated comment.\n", yylineno);
+    if (!comflag) fprintf(stderr, "Error type A at Line %d: Unterminated comment.\n", yylineno);
 }
 struct  {return (STRUCT);}
 return  {return (RETURN);}
@@ -51,8 +50,7 @@ float   { strcpy(yylval.type_str, "float"); return (TYPE); }
 {float} {
     if (*(char *)(yytext+strlen(yytext)-1) == 'e' || *(char *)(yytext+strlen(yytext)-1) == '+' || *(char *)(yytext+strlen(yytext)-1) == '-') {
         err_flag = 1;
-        if (*(char *)(yytext+strlen(yytext)-1) == '+' || *(char *)(yytext+strlen(yytext)-1) == '-') unput(*(char *)(yytext+strlen(yytext)-1));
-        fprintf(stderr, "\033[31mError type A at Line %d: Illegal float number %s\033[0m\n", yylineno, yytext);
+        fprintf(stderr, "Error type A at Line %d: Illegal float number %s\n", yylineno, yytext);
         return (FLOAT);
     } else {
         yylval.type_float = atof(yytext);
@@ -83,6 +81,6 @@ float   { strcpy(yylval.type_str, "float"); return (TYPE); }
 "]"     { return (RB); }
 "{"     { return (LC); }
 "}"     { return (RC); }
-.       { err_flag = 1; fprintf(stderr, "\033[31mError type A at Line %d: Mysterious character \"%s\"\033[0m\n", yylineno, yytext); }
+.       { err_flag = 1; fprintf(stderr, "Error type A at Line %d: Mysterious character \"%s\"\n", yylineno, yytext); }
 
 %%

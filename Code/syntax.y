@@ -15,7 +15,7 @@
     TreeNode *new_int(int num, int line_no);
     TreeNode *new_float(float num, int line_no);
     TreeNode *new_type(char* Type, int line_no);
-    TreeNode *new_relop(char* op, int line_no);
+    TreeNode *new_relop(const char* op, int line_no);
     TreeNode *new_id(char* id, int line_no);
     void printTree(TreeNode *c, int ind);
 %}
@@ -44,8 +44,8 @@
 %left   DOT LP RP LB RB
 %nonassoc   LOWER
 %nonassoc   ELSE
-
-
+%nonassoc   SEMI
+%nonassoc   error
 
 %%
 /* High-level Definitions */
@@ -66,10 +66,11 @@ ExtDefList: ExtDef ExtDefList {
         @$.first_line = yylineno;
         $$ = newNode("ExtDefList", yylineno);
     }
-    | error ExtDefList {
+    /*| error ExtDefList {
+        printf("error extdeflist\n");
         $$ = newNode("ExtDefList-error", yylineno);
         err_flag = 1;
-    }
+    }*/
     ;
 ExtDef: Specifier ExtDecList SEMI {
     $$ = newNode("ExtDef", @1.first_line);
@@ -89,6 +90,11 @@ ExtDef: Specifier ExtDecList SEMI {
         $$->left = $1;
         $1->right = $2;
         $2->right = $3;
+    }
+    | Specifier error CompSt {
+        printf("specifier error compst\n");
+        $$ = newNode("ExtDef-error", yylineno);
+        err_flag = 1;
     }
     ;
 ExtDecList: VarDec {
@@ -158,7 +164,7 @@ VarDec: ID {
     | VarDec LB INT RB {
         $$ = newNode("VarDec", @1.first_line);
         TreeNode *tmp1 = newNode("LB", @2.first_line);
-        TreeNode *tmp2 = newNode("INT", @3.first_line);
+        TreeNode *tmp2 = new_int($3, @3.first_line);
         TreeNode *tmp3 = newNode("RB", @4.first_line);
         $$->left = $1;
         $1->right = tmp1;
@@ -196,9 +202,9 @@ VarList: ParamDec COMMA VarList {
     | ParamDec {
         $$ = newNode("VarList", @1.first_line);
         $$->left = $1;
-        $1->right = $$;
     }
     | error COMMA VarList {
+        printf("error comma varlist\n");
         $$ = newNode("VarList-error", yylineno);
         err_flag = 1;
     }
@@ -220,6 +226,11 @@ CompSt: LC DefList StmtList RC {
     $2->right = $3;
     $3->right = tmp2;
 }
+    | LC DefList error RC {
+        printf("lc deflist error rc\n");
+        $$ = newNode("CompSt-error", yylineno);
+        err_flag = 1;
+    }
     ;
 StmtList: Stmt StmtList {
     $$ = newNode("StmtList", @1.first_line);
@@ -228,6 +239,11 @@ StmtList: Stmt StmtList {
 }
     | {
         $$ = newNode("StmtList", @$.first_line);
+    }
+    | Stmt error StmtList {
+        printf("stmt error stmtlist\n");
+        $$ = newNode("StmtList-error", yylineno);
+        err_flag = 1;
     }
     ;
 Stmt: Exp SEMI {
@@ -249,6 +265,7 @@ Stmt: Exp SEMI {
         $2->right = tmp2;
     }
     | RETURN error SEMI {
+        printf("return error semi\n");
         $$ = newNode("Stmt-error", @1.first_line);
         err_flag = 1;
     }
@@ -278,16 +295,18 @@ Stmt: Exp SEMI {
         tmp6->right = $7;
     }
     | IF error Stmt %prec LOWER {
+        printf("if error stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
         err_flag = 1;
     }
     | IF error Stmt ELSE Stmt {
+        printf("if error stmt else stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
         err_flag = 1;
     }
     | IF LP Exp RP error ELSE Stmt {
+        printf("if lp exp rp error else stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
-        printf("a");
         err_flag = 1;
     }
     | WHILE LP Exp RP Stmt {
@@ -302,17 +321,20 @@ Stmt: Exp SEMI {
         tmp4->right = $5;
     }
     | WHILE error Stmt {
+        printf("while error stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
         err_flag = 1;
     }
     | Exp error SEMI {
+        printf("exp error semi\n");
         $$ = newNode("Stmt-error", yylineno);
         err_flag = 1;
     }
-    | Exp error {
-        $$ = newNode("Stmt-error", @1.first_line);
+    /*| Exp error %prec LOWER {
+        printf("exp error\n");
+        $$ = newNode("Stmt-error", yylineno);
         err_flag = 1;
-    }
+    }*/
     ;
 
 /* Local Definitions */
@@ -324,6 +346,10 @@ DefList: Def DefList {
     | {
         $$ = newNode("DefList", @$.first_line);
     }
+    /*| Def error DefList {
+        $$ = newNode("DefList-error", yylineno);
+        err_flag = 1;
+    }*/
     ;
 Def: Specifier DecList SEMI {
     $$ = newNode("Def", @1.first_line);
@@ -333,13 +359,15 @@ Def: Specifier DecList SEMI {
     $2->right = tmp3;
 }   
     | Specifier error SEMI {
+        printf("specifier error semi\n");
         $$ = newNode("Def-error", yylineno);
         err_flag = 1;
     }
-    | error SEMI {
+    /*| error SEMI {
+        printf("error semi\n");
         $$ = newNode("Def-error", yylineno);
         err_flag = 1;
-    }
+    }*/
     ;
 DecList: Dec {
     $$ = newNode("DecList", @1.first_line);
@@ -390,7 +418,7 @@ Exp: Exp ASSIGNOP Exp {
     }
     | Exp RELOP Exp {
         $$ = newNode("Exp", @1.first_line);
-        TreeNode *tmp2 = newNode("RELOP", @2.first_line);
+        TreeNode *tmp2 = new_relop($2, @2.first_line);
         $$->left = $1;
         $1->right = tmp2;
         tmp2->right = $3;
@@ -494,6 +522,11 @@ Exp: Exp ASSIGNOP Exp {
         TreeNode *tmp1 = new_float($1, @1.first_line);
         $$->left = tmp1;
     }
+    | Exp error ASSIGNOP Exp {
+        printf("exp error assignop exp\n");
+        $$ = newNode("exp-error", yylineno);
+        err_flag = 1;
+    }
     ;
 Args: Exp COMMA Args {
     $$ = newNode("Args", @1.first_line);
@@ -512,7 +545,7 @@ Args: Exp COMMA Args {
 
 void yyerror(const char * msg) {
     err_flag = 1;
-    fprintf(stderr, "\033[31mError type B at line %d: %s\033[0m\n", yylineno, msg);
+    fprintf(stderr, "Error type B at line %d: %s\n", yylineno, msg);
 }
 
 TreeNode *newNode(const char* name, int line_no) {
@@ -538,7 +571,7 @@ TreeNode *new_type(char* Type, int line_no) {
     strcpy(ret->nodeval.type_str, Type);
     return ret;
 }
-TreeNode *new_relop(char* op, int line_no) {
+TreeNode *new_relop(const char* op, int line_no) {
     TreeNode *ret = newNode("RELOP", line_no);
     strcpy(ret->nodeval.type_str, op);
     return ret;
@@ -577,7 +610,7 @@ void printTree(TreeNode *c, int ind) {
         for (int i = 0; i < ind; ++i) {
             printf("  ");
         }
-        printf("RELOP: %s\n", c->nodeval.type_str);
+        printf("RELOP\n");
     }
     if (strcmp(c->node_type, "TYPE") == 0) {
         tflag = 1;
