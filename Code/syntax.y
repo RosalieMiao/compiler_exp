@@ -1,23 +1,6 @@
 %{
-    #include <stdio.h>
     #include "lex.yy.c"
-    void yyerror(const char * msg);
-    typedef struct TreeNode_{
-        YYSTYPE nodeval;
-        char node_type[40];
-        int line_no;
-        // struct TreeNode_ *parent;
-        struct TreeNode_ *left;
-        struct TreeNode_ *right;
-    } TreeNode;
-    TreeNode *root, *current;
-    TreeNode *newNode(const char* name, int line_no);
-    TreeNode *new_int(int num, int line_no);
-    TreeNode *new_float(float num, int line_no);
-    TreeNode *new_type(char* Type, int line_no);
-    TreeNode *new_relop(const char* op, int line_no);
-    TreeNode *new_id(char* id, int line_no);
-    void printTree(TreeNode *c, int ind);
+    #include "head.h"
 %}
 
 %union {
@@ -52,8 +35,11 @@
 Program: ExtDefList {  
     $$ = newNode("Program", @1.first_line);
     $$->left = $1;
-    if (!err_flag) {
+    /*if (!err_flag) {
         printTree($$, 0);
+    }*/
+    if (!err_flag) {
+        start_semantics($$);
     }
 }
     ;
@@ -67,7 +53,7 @@ ExtDefList: ExtDef ExtDefList {
         $$ = newNode("ExtDefList", yylineno);
     }
     /*| error ExtDefList {
-        printf("error extdeflist\n");
+        // printf("error extdeflist\n");
         $$ = newNode("ExtDefList-error", yylineno);
         err_flag = 1;
     }*/
@@ -92,9 +78,20 @@ ExtDef: Specifier ExtDecList SEMI {
         $2->right = $3;
     }
     | Specifier error CompSt {
-        printf("specifier error compst\n");
-        $$ = newNode("ExtDef-error", yylineno);
+        // printf("specifier error compst\n");
+        $$ = newNode("ExtDef-error", @1.first_line);
+        TreeNode *tmp2 = newNode("error", yylineno);
+        $$->left = $1;
+        $1->right = tmp2;
+        tmp2->right = $3;
         err_flag = 1;
+    }
+    | Specifier FunDec SEMI {
+        $$ = newNode("ExtDef",@1.first_line);
+        TreeNode *tmp3 = newNode("SEMI", @3.first_line);
+        $$->left = $1;
+        $1->right = $2;
+        $2->right = tmp3;
     }
     ;
 ExtDecList: VarDec {
@@ -204,8 +201,13 @@ VarList: ParamDec COMMA VarList {
         $$->left = $1;
     }
     | error COMMA VarList {
-        printf("error comma varlist\n");
+        // printf("error comma varlist\n");
         $$ = newNode("VarList-error", yylineno);
+        TreeNode *tmp1 = newNode("error", yylineno);
+        TreeNode *tmp2 = newNode("COMMA", @2.first_line);
+        $$->left = tmp1;
+        tmp1->right = tmp2;
+        tmp2->right = $3;
         err_flag = 1;
     }
     ;
@@ -227,8 +229,15 @@ CompSt: LC DefList StmtList RC {
     $3->right = tmp2;
 }
     | LC DefList error RC {
-        printf("lc deflist error rc\n");
+        // printf("lc deflist error rc\n");
         $$ = newNode("CompSt-error", yylineno);
+        TreeNode *tmp1 = newNode("LC", @1.first_line);
+        TreeNode *tmp3 = newNode("error", yylineno);
+        TreeNode *tmp4 = newNode("RC", @4.first_line);
+        $$->left = tmp1;
+        tmp1->right = $2;
+        $2->right = tmp3;
+        tmp3->right = tmp4;
         err_flag = 1;
     }
     ;
@@ -241,8 +250,12 @@ StmtList: Stmt StmtList {
         $$ = newNode("StmtList", @$.first_line);
     }
     | Stmt error StmtList {
-        printf("stmt error stmtlist\n");
+        // printf("stmt error stmtlist\n");
         $$ = newNode("StmtList-error", yylineno);
+        TreeNode * tmp2 = newNode("error", yylineno);
+        $$->left = $1;
+        $1->right = tmp2;
+        tmp2->right = $3;
         err_flag = 1;
     }
     ;
@@ -265,8 +278,14 @@ Stmt: Exp SEMI {
         $2->right = tmp2;
     }
     | RETURN error SEMI {
-        printf("return error semi\n");
+        // printf("return error semi\n");
         $$ = newNode("Stmt-error", @1.first_line);
+        TreeNode *tmp1 = newNode("RETURN", @1.first_line);
+        TreeNode * tmp2 = newNode("error", yylineno);
+        TreeNode *tmp3 = newNode("SEMI", @3.first_line);
+        $$->left = tmp1;
+        tmp1->right = tmp2;
+        tmp2->right = tmp3;
         err_flag = 1;
     }
     | IF LP Exp RP Stmt %prec LOWER {
@@ -295,18 +314,43 @@ Stmt: Exp SEMI {
         tmp6->right = $7;
     }
     | IF error Stmt %prec LOWER {
-        printf("if error stmt\n");
+        // printf("if error stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
+        TreeNode *tmp1 = newNode("IF", @1.first_line);
+        TreeNode *tmp2 = newNode("error", yylineno);
+        $$->left = tmp1;
+        tmp1->right = tmp2;
+        tmp2->right = $3;
         err_flag = 1;
     }
     | IF error Stmt ELSE Stmt {
-        printf("if error stmt else stmt\n");
+        // printf("if error stmt else stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
+        TreeNode *tmp1 = newNode("IF", @1.first_line);
+        TreeNode *tmp2 = newNode("error", yylineno);
+        TreeNode *tmp4 = newNode("ELSE", @4.first_line);
+        $$->left = tmp1;
+        tmp1->right = tmp2;
+        tmp2->right = $3;
+        $3->right = tmp4;
+        tmp4->right = $5;
         err_flag = 1;
     }
     | IF LP Exp RP error ELSE Stmt {
-        printf("if lp exp rp error else stmt\n");
+        // printf("if lp exp rp error else stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
+        TreeNode *tmp1 = newNode("IF", @1.first_line);
+        TreeNode *tmp2 = newNode("LP", @2.first_line);
+        TreeNode *tmp4 = newNode("RP", @4.first_line);
+        TreeNode *tmp5 = newNode("error", yylineno);
+        TreeNode *tmp6 = newNode("ELSE", @6.first_line);
+        $$->left = tmp1;
+        tmp1->right = tmp2;
+        tmp2->right = $3;
+        $3->right = tmp4;
+        tmp4->right = tmp5;
+        tmp5->right = tmp6;
+        tmp6->right = $7;
         err_flag = 1;
     }
     | WHILE LP Exp RP Stmt {
@@ -321,17 +365,27 @@ Stmt: Exp SEMI {
         tmp4->right = $5;
     }
     | WHILE error Stmt {
-        printf("while error stmt\n");
+        // printf("while error stmt\n");
         $$ = newNode("Stmt-error", @1.first_line);
+        TreeNode *tmp1 = newNode("WHILE", @1.first_line);
+        TreeNode *tmp2 = newNode("error", yylineno);
+        $$->left = tmp1;
+        tmp1->right = tmp2;
+        tmp2->right = $3;
         err_flag = 1;
     }
     | Exp error SEMI {
-        printf("exp error semi\n");
-        $$ = newNode("Stmt-error", yylineno);
+        // printf("exp error semi\n");
+        $$ = newNode("Stmt-error", @1.first_line);
+        TreeNode *tmp2 = newNode("error", yylineno);
+        TreeNode *tmp3 = newNode("SEMI", @3.first_line);
+        $$->left = $1;
+        $1->right = tmp2;
+        tmp2->right = tmp3;
         err_flag = 1;
     }
     /*| Exp error %prec LOWER {
-        printf("exp error\n");
+        // printf("exp error\n");
         $$ = newNode("Stmt-error", yylineno);
         err_flag = 1;
     }*/
@@ -359,12 +413,17 @@ Def: Specifier DecList SEMI {
     $2->right = tmp3;
 }   
     | Specifier error SEMI {
-        printf("specifier error semi\n");
-        $$ = newNode("Def-error", yylineno);
+        // printf("specifier error semi\n");
+        $$ = newNode("Def-error", @1.first_line);
+        TreeNode * tmp2 = newNode("error", yylineno);
+        TreeNode *tmp3 = newNode("SEMI", @3.first_line);
+        $$->left = $1;
+        $1->right = tmp2;
+        tmp2->right = tmp3;
         err_flag = 1;
     }
     /*| error SEMI {
-        printf("error semi\n");
+        // printf("error semi\n");
         $$ = newNode("Def-error", yylineno);
         err_flag = 1;
     }*/
@@ -523,8 +582,14 @@ Exp: Exp ASSIGNOP Exp {
         $$->left = tmp1;
     }
     | Exp error ASSIGNOP Exp {
-        printf("exp error assignop exp\n");
-        $$ = newNode("exp-error", yylineno);
+        // printf("exp error assignop exp\n");
+        $$ = newNode("exp-error", @1.first_line);
+        TreeNode *tmp2 = newNode("error", yylineno);
+        TreeNode *tmp3 = newNode("ASSIGNOP", @3.first_line);
+        $$->left = $1;
+        $1->right = tmp2;
+        tmp2->right = tmp3;
+        tmp3->right = $4;
         err_flag = 1;
     }
     ;
@@ -582,7 +647,7 @@ TreeNode *new_id(char* id, int line_no) {
     return ret;
 }
 
-void printTree(TreeNode *c, int ind) {
+/*void printTree(TreeNode *c, int ind) {
     int tflag = 0;
     if (strcmp(c->node_type, "INT") == 0) {
         tflag = 1;
@@ -648,4 +713,4 @@ void printTree(TreeNode *c, int ind) {
     if (c->right != NULL) {
         printTree(c->right, ind);
     }
-}
+}*/
