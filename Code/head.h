@@ -39,16 +39,17 @@ typedef struct FieldList_ FieldList;		//结构体类型
 typedef struct Symbol_ Symbol;				//符号表
 typedef struct Function_ Function;			//函数类型
 typedef struct SymbolStack_ SymbolStack;	//符号表栈
+typedef struct StructList_ StructList;		//结构体表
 
 struct Type_ {
 	enum { BASIC, ARRAY, STRUCTURE }	kind;
 	union {
 		//基本类型
-		int basic;
+		int basic;//0: int	1: float
 		//数组类型 信息包括元素类型与数组大小构成
 		struct { Type* elem; int size; }	array;
 		//结构体类型 信息是一个链表
-		FieldList* structure;
+		struct {char* name; FieldList* first;}	structure;
 	} u;
 };
 
@@ -56,6 +57,11 @@ struct FieldList_ {
 	char* name;//域的名字
 	Type* type;//域的类型
 	FieldList* tail;//下一个域
+};
+
+struct StructList_ {
+	Type* structure;
+	StructList* nxt;
 };
 
 struct Symbol_ {
@@ -78,8 +84,31 @@ struct Function_ {
 
 struct SymbolStack_ {
 	Symbol* root;
-	Symbol* pre;
-	Symbol* nxt;
+	SymbolStack* pre;
+	SymbolStack* nxt;
 };
 
 SymbolStack* sym_st;
+StructList* str_list;
+
+void my_dfs(TreeNode *c);
+void extdef_process(TreeNode* c);
+void extdeclist_process(TreeNode* c, Type* t);
+Type* specifier_process(TreeNode *c);
+int deflist_process(TreeNode* c, FieldList* s);//返回0：非空 返回1：空
+void declist_process(TreeNode* c, Type* t, FieldList* s);
+void vardec_process(TreeNode* c, Type* t, FieldList* s);
+void def_process(TreeNode* c, FieldList* s);
+
+Type *find_structure(char *name);
+void add_structure(Type* s);
+Symbol* find_symbol(char *name); //返回NULL为没找到
+Symbol* find_symbol_atlevel(SymbolStack* s, char* name);
+void add_symbol(Symbol *s);
+void push_symbolstack();
+void pop_symbolstack();
+
+
+//debug
+void print_structlist();
+void print_symbol();

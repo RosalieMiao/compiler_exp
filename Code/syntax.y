@@ -35,6 +35,7 @@
 Program: ExtDefList {  
     $$ = newNode("Program", @1.first_line);
     $$->left = $1;
+    // printTree($$, 0);
     /*if (!err_flag) {
         printTree($$, 0);
     }*/
@@ -66,11 +67,11 @@ ExtDef: Specifier ExtDecList SEMI {
     $2->right = tmp;
 }
     | Specifier SEMI {
-    $$ = newNode("ExtDef", @1.first_line);
-    TreeNode * tmp = newNode("SEMI", @2.first_line);
-    $$->left = $1;
-    $1->right = tmp;
-}
+        $$ = newNode("ExtDef", @1.first_line);
+        TreeNode * tmp = newNode("SEMI", @2.first_line);
+        $$->left = $1;
+        $1->right = tmp;
+    }
     | Specifier FunDec CompSt {
         $$ = newNode("ExtDef", @1.first_line);
         $$->left = $1;
@@ -647,8 +648,15 @@ TreeNode *new_id(char* id, int line_no) {
     return ret;
 }
 
-/*void printTree(TreeNode *c, int ind) {
+void printTree(TreeNode *c, int ind) {
     int tflag = 0;
+    if (strcmp(c->node_type, "error") == 0) {
+        tflag = 1;
+        for (int i = 0; i < ind; ++i) {
+            printf("  ");
+        }
+        printf("error\n");
+    }
     if (strcmp(c->node_type, "INT") == 0) {
         tflag = 1;
         for (int i = 0; i < ind; ++i) {
@@ -713,4 +721,4 @@ TreeNode *new_id(char* id, int line_no) {
     if (c->right != NULL) {
         printTree(c->right, ind);
     }
-}*/
+}
