@@ -41,8 +41,13 @@ void extdef_process(TreeNode* c) {
         printf("error\n");
         return;
     }
-    c = c->left;
+    c = c->left;//c:Specifier
     Type* t = specifier_process(c);
+    if (t == NULL) {
+        t = (Type*) malloc(sizeof(Type));
+        t->kind = BASIC;
+        t->u.basic = 0;
+    }
     if (c->right == NULL) {
         printf("error\n");
         return;
@@ -52,8 +57,58 @@ void extdef_process(TreeNode* c) {
         extdeclist_process(c, t);
         return;
     } 
-    if (strcmp(c->node_type, "FunDec") == 0) {
-        // TODO();
+    if (strcmp(c->node_type, "FunDec") == 0) {//Specifier FunDec SEMI && Specifier FunDec CompSt
+        if (c->right == NULL) {
+            printf("error\n");
+            return;
+        }
+        push_symbolstack();
+        Symbol* func = fundec_process(c, t);
+        // printf("func:%s\n", func->u.function_type->param_p->type->u.structure.name);
+        c = c->right;
+        if (strcmp(c->node_type, "SEMI") == 0) {
+            Symbol* tmp_sym = find_symbol(func->name);
+            if (tmp_sym != NULL) {
+                if (tmp_sym->kind != FUNC) {
+                    printf("Error type 3 at Line %d: Redefined variable \"%s\"\n", c->line_no, tmp_sym->name);
+                    pop_symbolstack();
+                    return;
+                }
+                if (func_comp(tmp_sym, func)) {
+                    printf("Error type 19 at Line %d: Inconsistent declaration of function \"%s\"\n", c->line_no, tmp_sym->name);
+                    pop_symbolstack();
+                    return;
+                }
+            } else {
+                pop_symbolstack();
+                add_symbol(func);
+            }
+        } else {
+            if (strcmp(c->node_type, "CompSt")) {
+                printf("error\n");
+                pop_symbolstack();
+                return;
+            }
+            Symbol* tmp_sym = find_symbol(func->name);
+            int flag = 1;
+            if (tmp_sym != NULL) {
+                flag = 0;
+                if (tmp_sym->kind != FUNC) {
+                    printf("Error type 3 at Line %d: Redefined variable \"%s\"\n", c->line_no, tmp_sym->name);
+                } else {
+                    if (func->u.function_type->is_def = 1) {
+                        printf("Error type 19 at Line %d: Function \"%s\" has been defined", c->line_no, tmp_sym->name);
+                    }
+                    if (func_comp(tmp_sym, func)) {
+                        printf("Error type 19 at Line %d: Inconsistent declaration of function \"%s\"\n", c->line_no, tmp_sym->name);
+                    }
+                }
+            }
+            //compst_process();
+            func->u.function_type->is_def = 1;
+            pop_symbolstack();
+            if (flag) add_symbol(func);
+        }
         return;
     }
     if (strcmp(c->node_type, "SEMI")) {
@@ -67,7 +122,7 @@ void extdeclist_process(TreeNode* c, Type* t) {
         return;
     }
     c = c->left;//c:VarDec
-    vardec_process(c, t, NULL);
+    vardec_process(c, t, NULL, NULL);
     if (c->right == NULL) return;
     else {
         c = c->right;
@@ -87,6 +142,7 @@ Type* specifier_process(TreeNode *c) {
         ret->kind = BASIC;
         if (strcmp(tmp->nodeval.type_str, "int")) ret->u.basic = 0;
         else ret->u.basic = 1;
+        return ret;
     } else {//StructSpecifier
         if (strcmp(tmp->node_type, "StructSpecifier") || tmp->left == NULL) {
             printf("error\n");
@@ -107,12 +163,15 @@ Type* specifier_process(TreeNode *c) {
             tmp = tmp->right;
             if (tmp == NULL || strcmp(tmp->node_type, "LC")) {
                 printf("error\n");
+                free(ret);
                 return NULL;
             }
             push_symbolstack();
             tmp = tmp->right;
             if (tmp == NULL || strcmp(tmp->node_type, "DefList")) {
                 printf("error\n");
+                pop_symbolstack();
+                free(ret);
                 return NULL;
             }
             deflist_process(tmp, structure);
@@ -122,6 +181,7 @@ Type* specifier_process(TreeNode *c) {
                 // if (find_structure(ret->u.structure.name) != NULL) printf("?????\n");
                 // print_structlist();
                 printf("Error type 16 at Line %d: Duplicated name \"%s\"\n", c->left->left->right->left->line_no, ret->u.structure.name);
+                free(ret);
                 return NULL;
             } else {
                 // printf("AAAA\n");
@@ -129,7 +189,7 @@ Type* specifier_process(TreeNode *c) {
                 return ret;
             }
         } else {
-            if (strcmp(tmp->node_type, "Tag") || tmp->left == NULL) {
+            if (strcmp(tmp->node_type, "Tag") || tmp->left == NULL || strcmp(tmp->left->node_type, "ID")) {
                 printf("error\n");
                 return NULL;
             }
@@ -140,6 +200,34 @@ Type* specifier_process(TreeNode *c) {
         }
     }
     return NULL;
+}
+
+Symbol* fundec_process(TreeNode* c, Type* t) {
+    if (c->left == NULL || strcmp(c->left->node_type, "ID") || c->left->right == NULL || strcmp(c->left->right->node_type, "LP") || c->left->right->right == NULL) {
+        printf("error\n");
+        return NULL;
+    }
+    Symbol* ret = (Symbol*) malloc(sizeof(Symbol));
+    ret->kind = FUNC;
+    ret->name = c->left->nodeval.type_str;
+    ret->nxt = NULL;
+    Function* new_func = (Function*) malloc(sizeof(Function));
+    new_func->ret_type = t;
+    new_func->is_def = 0;
+    new_func->param_p = NULL;
+    c = c->left->right->right;
+    if (strcmp(c->node_type, "VarList") == 0) {
+        varlist_process(c, new_func);
+    } else {
+        if (strcmp(c->node_type, "RP")) {
+            printf("error\n");
+            return NULL;
+        }
+        new_func->param_num = 0;
+        new_func->param_p = NULL;
+    }
+    ret->u.function_type = new_func;
+    return ret;
 }
 
 int deflist_process(TreeNode* c, FieldList* s) {//s = NULL : 非结构体定义时
@@ -178,41 +266,7 @@ void declist_process(TreeNode* c, Type* t, FieldList* s) {
         printf("error\n");
         return;
     }
-    if (tmp->left == NULL) {
-        printf("error\n");
-    } else {
-        tmp = tmp->left;
-        if (strcmp(tmp->node_type, "ID") == 0) {
-            Symbol* sym_tmp = (Symbol*) malloc(sizeof(Symbol));
-            sym_tmp->kind = VARIABLE;
-            sym_tmp->name = tmp->nodeval.type_str;
-            sym_tmp->nxt = NULL;
-            sym_tmp->u.variable_type = t;
-            if (s == NULL) {
-                if (find_symbol(tmp->nodeval.type_str) != NULL || find_structure(tmp->nodeval.type_str) != NULL) {
-                    printf("Error type 3 at Line %d: Redefined variable \"%s\"\n", tmp->line_no, tmp->nodeval.type_str);
-                    free(sym_tmp);
-                } else {
-                    add_symbol(sym_tmp);
-                }
-            } else {
-                if (find_symbol_atlevel(sym_st, sym_tmp->name) != NULL) {
-                    printf("Error type 15 at Line %d: Redefined field \"%s\"\n", tmp->line_no, sym_tmp->name);
-                    free(sym_tmp);
-                } else {
-                    add_symbol(sym_tmp);
-                    s->name = sym_tmp->name;
-                    s->type = t;
-                    s->tail = NULL;
-                }
-            }
-        } else {
-            if (strcmp(tmp->node_type, "VarDec") == 0) {
-                vardec_process(c->left, t, s);
-            }
-        }
-    }
-    tmp = c->left;//tmp: VarDec
+    vardec_process(tmp, t, s, NULL);
     if (tmp->right != NULL) {
         tmp = tmp->right;
         if (strcmp(tmp->node_type, "ASSIGNOP")) {
@@ -230,34 +284,31 @@ void declist_process(TreeNode* c, Type* t, FieldList* s) {
     }
 }
 
-void vardec_process(TreeNode* c, Type* t, FieldList* s) {
-    if (c->left == NULL) {
-        printf("error\n");
-        return;
-    }
+void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f) {
+    if (c->left == NULL) { printf("error\n");  return;}
     if (strcmp(c->left->node_type, "ID") == 0) {
         Symbol* sym_tmp = (Symbol*)malloc(sizeof(Symbol));
-        sym_tmp->kind = ARRAY;
+        sym_tmp->kind = VARIABLE;
         sym_tmp->name = c->left->nodeval.type_str;
         sym_tmp->u.variable_type = t;
         sym_tmp->nxt = NULL;
-        if (s == NULL) {
-            if (find_symbol(sym_tmp->name) != NULL || find_structure(sym_tmp->name) != NULL) {
+        if (find_symbol_atlevel(sym_st, sym_tmp->name) != NULL || find_structure(sym_tmp->name) != NULL) {
+            if (s == NULL) {
                 printf("Error type 3 at Line %d: Redefined variable \"%s\"\n", c->left->line_no, sym_tmp->name);
                 free(sym_tmp);
             } else {
-                // printf("aaaaaaaa\n");
-                add_symbol(sym_tmp);
-            }
-        } else {
-            if (find_symbol_atlevel(sym_st, sym_tmp->name) != NULL) {
                 printf("Error type 15 at Line %d: Redefined field \"%s\"\n", c->left->line_no, sym_tmp->name);
                 free(sym_tmp);
-            } else {
-                add_symbol(sym_tmp);
+            }
+        } else {
+            add_symbol(sym_tmp);
+            if (s != NULL) {
                 s->name = sym_tmp->name;
                 s->tail = NULL;
                 s->type = t;
+            }
+            if (f != NULL) {
+                add_func_param(f, sym_tmp);
             }
         }
     } else {
@@ -270,12 +321,12 @@ void vardec_process(TreeNode* c, Type* t, FieldList* s) {
             printf("error\n");
             return;
         }
-        tmp = tmp->right;
+        tmp = tmp->right;//tmp: INT
         Type* new_type = (Type*) malloc(sizeof(Type));
         new_type->kind = ARRAY;
         new_type->u.array.size = tmp->nodeval.type_int;
         new_type->u.array.elem = t;
-        vardec_process(c->left, new_type, s);
+        vardec_process(c->left, new_type, s, f);
     }
 }
 
@@ -295,10 +346,38 @@ void def_process(TreeNode* c, FieldList* s) {
     }
 }
 
+void varlist_process(TreeNode* c, Function* f) {
+    if (c->left == NULL || strcmp(c->left->node_type, "ParamDec")) {
+        printf("error\n");
+        return;
+    }
+    c = c->left;//c: ParamDec
+    if (c->left == NULL || strcmp(c->left->node_type, "Specifier") ||
+    c->left->right == NULL || strcmp(c->left->right->node_type, "VarDec")) {
+        printf("error");
+        return;
+    }
+    Type* t = specifier_process(c->left);
+    if (t == NULL) {
+        t = (Type*) malloc(sizeof(Type));
+        t->kind = BASIC;
+        t->u.basic = 0;
+    }
+    vardec_process(c->left->right, t, NULL, f);
+    if (c->right == NULL) return;
+    c = c->right;
+    if (strcmp(c->node_type, "COMMA") || c->right == NULL || strcmp(c->right->node_type, "VarList")) {
+        printf("error\n");
+        return;
+    }
+    varlist_process(c->right, f);
+}
+
 Type *find_structure(char *name) {
     StructList *tmp = str_list;
     while (tmp != NULL) {
-        if (strcmp(tmp->structure->u.structure.name, name) == 0) return tmp->structure;
+        if (tmp->structure->u.structure.name != NULL && strcmp(tmp->structure->u.structure.name, name) == 0) 
+            return tmp->structure;
         tmp = tmp->nxt;
     }
     return NULL;
@@ -366,6 +445,76 @@ void pop_symbolstack() {
         tmp1 = tmp2;
     }
     free(tmp);
+}
+
+void add_func_param(Function* f, Symbol* s) {
+    f->param_num++;
+    FieldList* field = (FieldList*) malloc(sizeof(FieldList));
+    field->name = s->name;
+    // if (s->u.variable_type->kind == 2)
+    //     printf("add_func:%s\n", s->u.variable_type->u.structure.name);
+    field->type = s->u.variable_type;
+    field->tail = NULL;
+    FieldList* tmp = f->param_p;
+    if (tmp == NULL) {
+        f->param_p = field;
+    }
+    else {
+        while (tmp->tail != NULL) tmp = tmp->tail;
+        tmp->tail = field;
+    }
+}
+
+int func_comp(const Symbol* a, const Symbol* b) {
+    if (a->kind != FUNC || b->kind != FUNC) {
+        return 1;
+    }
+    Function* af = a->u.function_type;
+    Function* bf = b->u.function_type;
+    if (af->ret_type == NULL || bf->ret_type == NULL) {
+        return 1;
+    }
+    if (type_comp(af->ret_type, bf->ret_type)) { return 1; }
+    if (af->param_num != bf->param_num) { return 1; }
+    FieldList* a1 = a->u.function_type->param_p;
+    FieldList* b1 = b->u.function_type->param_p;
+    while (a1 != NULL) {
+        if (b1 == NULL) return 1;
+        if (type_comp(a1->type, b1->type)) {
+            // if (b1->type->kind != a1->type->kind) printf("a?:%d %d\n", a1->type->kind, b1->type->kind);
+            // printf("%s %s\n", a1->type->u.structure.name, b1->type->u.structure.name);
+            return 1;
+        }
+        if (strcmp(a1->name, b1->name)) return 1;
+        a1 = a1->tail;
+        b1 = b1->tail;
+    }
+    if (b1 != NULL) return 1;
+    return 0;
+}
+
+int type_comp(const Type* a, const Type* b) {
+    if (a->kind != b->kind) return 1;
+    if (a->kind == BASIC) {
+        if (a->u.basic != b->u.basic) return 1;
+        return 0;
+    }
+    if (a->kind == ARRAY) {
+        if (a->u.array.size != b->u.array.size) return 1;
+        return type_comp(a->u.array.elem, b->u.array.elem);
+    }
+    if (a->kind == STRUCTURE) {
+        FieldList* af = a->u.structure.first;
+        FieldList* bf = b->u.structure.first;
+        while (af != NULL) {
+            if (bf == NULL) return 1;
+            if (type_comp(af->type, bf->type)) return 1;
+            af = af->tail;
+            bf = bf->tail;
+        }
+        if (bf != NULL) return 1;
+        return 0;
+    }
 }
 
 void print_structlist() {

@@ -79,7 +79,8 @@ struct Symbol_ {
 struct Function_ {
 	Type* ret_type;
 	int param_num;
-	Symbol* param_p;
+	FieldList* param_p;
+	int is_def;
 };
 
 struct SymbolStack_ {
@@ -95,10 +96,13 @@ void my_dfs(TreeNode *c);
 void extdef_process(TreeNode* c);
 void extdeclist_process(TreeNode* c, Type* t);
 Type* specifier_process(TreeNode *c);
+Symbol* fundec_process(TreeNode* c, Type* t);
 int deflist_process(TreeNode* c, FieldList* s);//返回0：非空 返回1：空
 void declist_process(TreeNode* c, Type* t, FieldList* s);
-void vardec_process(TreeNode* c, Type* t, FieldList* s);
+//vardec_process须判断是不是数组，是数组时调用
+void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f);
 void def_process(TreeNode* c, FieldList* s);
+void varlist_process(TreeNode* c, Function* f);
 
 Type *find_structure(char *name);
 void add_structure(Type* s);
@@ -107,7 +111,10 @@ Symbol* find_symbol_atlevel(SymbolStack* s, char* name);
 void add_symbol(Symbol *s);
 void push_symbolstack();
 void pop_symbolstack();
+void add_func_param(Function* f, Symbol* s);
 
+int func_comp(const Symbol* a,const Symbol* b);//相等返回0 否则返回1
+int type_comp(const Type* a, const Type* b);
 
 //debug
 void print_structlist();
