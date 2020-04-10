@@ -81,6 +81,7 @@ struct Function_ {
 	int param_num;
 	FieldList* param_p;
 	int is_def;
+	int line_no;
 };
 
 struct SymbolStack_ {
@@ -91,6 +92,8 @@ struct SymbolStack_ {
 
 SymbolStack* sym_st;
 StructList* str_list;
+Type* int_type;
+Type* float_type;
 
 void my_dfs(TreeNode *c);
 void extdef_process(TreeNode* c);
@@ -103,6 +106,8 @@ void declist_process(TreeNode* c, Type* t, FieldList* s);
 void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f);
 void def_process(TreeNode* c, FieldList* s);
 void varlist_process(TreeNode* c, Function* f);
+Symbol* exp_process(TreeNode* c);
+void compst_process(TreeNode* c, Type* t);
 
 Type *find_structure(char *name);
 void add_structure(Type* s);
@@ -112,9 +117,18 @@ void add_symbol(Symbol *s);
 void push_symbolstack();
 void pop_symbolstack();
 void add_func_param(Function* f, Symbol* s);
+void function_test();
 
+Symbol* structure_dot_find(FieldList* f, char *name);
+int args_comp(FieldList* f, TreeNode* c);
 int func_comp(const Symbol* a,const Symbol* b);//相等返回0 否则返回1
 int type_comp(const Type* a, const Type* b);
+void symbolstack_init(SymbolStack* s);
+void symbol_init(Symbol* s);
+void type_init(Type* t);
+void fieldlist_init(FieldList* f);
+void function_init(Function* f);
+void structlist_init(StructList* s);
 
 //debug
 void print_structlist();
