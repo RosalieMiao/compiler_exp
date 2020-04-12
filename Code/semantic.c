@@ -62,8 +62,9 @@ void extdef_process(TreeNode* c) {
         push_symbolstack();
         Symbol* func = fundec_process(c, t);
         // printf("func:%s\n", func->u.function_type->param_p->type->u.structure.name);
-        c = c->right;
-        if (strcmp(c->node_type, "SEMI") == 0) {
+        // c = c->right;
+        TreeNode* tmp = c->right;
+        if (strcmp(tmp->node_type, "SEMI") == 0) {
             Symbol* tmp_sym = find_symbol(func->name);
             if (tmp_sym != NULL) {
                 if (tmp_sym->kind != FUNC) {
@@ -81,7 +82,7 @@ void extdef_process(TreeNode* c) {
                 add_symbol(func);
             }
         } else {
-            if (strcmp(c->node_type, "CompSt")) {
+            if (strcmp(tmp->node_type, "CompSt")) {
                 printf("error\n");
                 pop_symbolstack();
                 return;
@@ -93,21 +94,21 @@ void extdef_process(TreeNode* c) {
                 if (tmp_sym->kind != FUNC) {
                     printf("Error type 3 at Line %d: Redefined variable \"%s\".\n", c->line_no, tmp_sym->name);
                 } else {
-                    tmp_sym->u.function_type->is_def = 1;
                     tmp_sym->u.function_type->line_no = func->u.function_type->line_no;
-                    if (func->u.function_type->is_def == 1) {
+                    if (tmp_sym->u.function_type->is_def == 1) {
                         printf("Error type 4 at Line %d: Redefined function \"%s\".\n", c->line_no, tmp_sym->name);
                     } else {
+                        tmp_sym->u.function_type->is_def = 1;
                         if (func_comp(tmp_sym, func)) {
                             printf("Error type 19 at Line %d: Inconsistent declaration of function \"%s\".\n", c->line_no, tmp_sym->name);
                         }
                     }
                 }
             } else func->u.function_type->is_def = 1;
-            compst_process(c, t);
-            pop_symbolstack();
-            if (flag && tmp_sym == NULL) add_symbol(func);
+            if (flag && tmp_sym == NULL) add_symbol_atlevel(sym_st->nxt, func);
             else free(func);
+            compst_process(tmp, t, 1);
+            pop_symbolstack();
         }
         return;
     }
@@ -140,7 +141,7 @@ Type* specifier_process(TreeNode *c) {
     if (tmp != NULL && strcmp(tmp->node_type, "TYPE") == 0) {
         if (strcmp(tmp->nodeval.type_str, "int") == 0) return int_type;
         else return float_type;
-    } else {//StructSpecifier
+    } else {//tmp: StructSpecifier
         if (strcmp(tmp->node_type, "StructSpecifier") || tmp->left == NULL) {
             printf("error\n");
             return NULL;
@@ -157,8 +158,8 @@ Type* specifier_process(TreeNode *c) {
             ret->kind = STRUCTURE;
             ret->u.structure.first = NULL;
             ret->u.structure.name = NULL;
-            FieldList* structure = (FieldList*)malloc(sizeof(FieldList));
-            fieldlist_init(structure);
+            // FieldList* structure = (FieldList*)malloc(sizeof(FieldList));
+            // fieldlist_init(structure);
             if (tmp->left == NULL) ret->u.structure.name = NULL;
             else ret->u.structure.name = tmp->left->nodeval.type_str;
             tmp = tmp->right;
@@ -175,9 +176,9 @@ Type* specifier_process(TreeNode *c) {
                 free(ret);
                 return NULL;
             }
-            deflist_process(tmp, structure);
+            deflist_process(tmp, ret);
             pop_symbolstack();
-            ret->u.structure.first = structure;
+            // ret->u.structure.first = structure;
             if (find_structure(ret->u.structure.name) != NULL || find_symbol(ret->u.structure.name) != NULL) {
                 // if (find_structure(ret->u.structure.name) != NULL) printf("?????\n");
                 // print_structlist();
@@ -233,7 +234,7 @@ Symbol* fundec_process(TreeNode* c, Type* t) {
     return ret;
 }
 
-int deflist_process(TreeNode* c, FieldList* s) {//s = NULL : 非结构体定义时
+int deflist_process(TreeNode* c, Type* st) {//st = NULL : 非结构体定义时
     if (c->left == NULL) {
         return 1;
     }
@@ -241,25 +242,26 @@ int deflist_process(TreeNode* c, FieldList* s) {//s = NULL : 非结构体定义�
         printf("error\n"); return 1;
     }
     c = c->left;//c:Def
-    def_process(c, s);
+    def_process(c, st);
     if (c->right == NULL || strcmp(c->right->node_type, "DefList")) {
         printf("error\n");
         return 1;
     }
-    if (s != NULL) {
-        FieldList* new_field = (FieldList*) malloc(sizeof(FieldList));
-        fieldlist_init(new_field);
-        if (deflist_process(c->right, new_field)) {
-            free(new_field);
-            s->tail = NULL;
-        } else {s->tail = new_field;}
-    } else {
-        deflist_process(c->right, s);
-    }
+    // if (st != NULL) {
+    //     FieldList* new_field = (FieldList*) malloc(sizeof(FieldList));
+    //     fieldlist_init(new_field);
+    //     if (deflist_process(c->right, new_field)) {
+    //         free(new_field);
+    //         s->tail = NULL;
+    //     } else {s->tail = new_field;}
+    // } else {
+    //     deflist_process(c->right, st);
+    // }
+    deflist_process(c->right, st);
     return 0;
 }
 
-void declist_process(TreeNode* c, Type* t, FieldList* s) {
+void declist_process(TreeNode* c, Type* t, Type* st) {
     if(c->left == NULL || strcmp(c->left->node_type, "Dec")) {
         printf("error\n");
         return;
@@ -270,7 +272,7 @@ void declist_process(TreeNode* c, Type* t, FieldList* s) {
         printf("error\n");
         return;
     }
-    vardec_process(tmp, t, s, NULL);
+    vardec_process(tmp, t, st, NULL);
     if (tmp->right != NULL) {
         tmp = tmp->right;
         if (strcmp(tmp->node_type, "ASSIGNOP")) {
@@ -280,11 +282,16 @@ void declist_process(TreeNode* c, Type* t, FieldList* s) {
                 printf("error\n");
                 return;
             }
-            if (s != NULL) {
+            if (st != NULL) {
                 printf("Error type 15 at Line %d: Initialize the field when defining the structure.\n", tmp->line_no);
             } else {//VarDec ASSIGNOP EXP
                 Symbol* ret = exp_process(tmp->right);
-                if (ret != NULL && type_comp(t, ret->u.variable_type)) {
+                Symbol* top_sym = top_symbolstack();
+                if (top_sym == NULL) {
+                    printf("error\n");
+                    return;
+                }
+                if (ret != NULL && type_comp(top_sym->u.variable_type, ret->u.variable_type)) {
                     printf("Error type 5 at Line %d: Type mismatched for assignment.\n", tmp->line_no);
                 }
                 if (ret != NULL) free(ret);
@@ -292,11 +299,11 @@ void declist_process(TreeNode* c, Type* t, FieldList* s) {
         }
     }
     if (c->right != NULL && strcmp(c->right->node_type, "COMMA") == 0 && c->right->right != NULL) {
-        declist_process(c->right->right, t, s);
+        declist_process(c->right->right, t, st);
     }
 }
 
-void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f) {
+void vardec_process(TreeNode* c, Type* t, Type* st, Function* f) {
     if (c->left == NULL) { printf("error\n");  return;}
     if (strcmp(c->left->node_type, "ID") == 0) {
         Symbol* sym_tmp = (Symbol*)malloc(sizeof(Symbol));
@@ -305,7 +312,7 @@ void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f) {
         sym_tmp->name = c->left->nodeval.type_str;
         sym_tmp->u.variable_type = t;
         if (find_symbol_atlevel(sym_st, sym_tmp->name) != NULL || find_structure(sym_tmp->name) != NULL) {
-            if (s == NULL) {
+            if (st == NULL) {
                 printf("Error type 3 at Line %d: Redefined variable \"%s\".\n", c->left->line_no, sym_tmp->name);
                 free(sym_tmp);
             } else {
@@ -314,10 +321,8 @@ void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f) {
             }
         } else {
             add_symbol(sym_tmp);
-            if (s != NULL) {
-                s->name = sym_tmp->name;
-                s->tail = NULL;
-                s->type = t;
+            if (st != NULL) {
+                add_struct_field(st, sym_tmp);
             }
             if (f != NULL) {
                 add_func_param(f, sym_tmp);
@@ -339,11 +344,11 @@ void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f) {
         new_type->kind = ARRAY;
         new_type->u.array.size = tmp->nodeval.type_int;
         new_type->u.array.elem = t;
-        vardec_process(c->left, new_type, s, f);
+        vardec_process(c->left, new_type, st, f);
     }
 }
 
-void def_process(TreeNode* c, FieldList* s) {
+void def_process(TreeNode* c, Type* st) {
     if (c->left == NULL || strcmp(c->left->node_type, "Specifier")) {
         printf("error\n");
         return;
@@ -355,7 +360,7 @@ void def_process(TreeNode* c, FieldList* s) {
             printf("error\n");
             return;
         }
-        declist_process(tmp->right, s_type, s);
+        declist_process(tmp->right, s_type, st);
     }
 }
 
@@ -386,7 +391,7 @@ void varlist_process(TreeNode* c, Function* f) {
 
 Symbol* exp_process(TreeNode* c) {
     if (c->left == NULL) {
-        printf("error");
+        printf("error 1");
         return NULL;
     }
     c = c->left;
@@ -401,20 +406,23 @@ Symbol* exp_process(TreeNode* c) {
             Symbol* ret = (Symbol*)malloc(sizeof(Symbol));
             memcpy(ret, exp_sym, sizeof(Symbol));
             if (ret->kind == FUNC) {
-                Symbol* tmp = (Symbol*)malloc(sizeof(Symbol));
-                symbol_init(tmp);
-                tmp->kind = VARIABLE;
-                tmp->u.variable_type = ret->u.function_type->ret_type;
-                return tmp;
+                // Symbol* tmp = (Symbol*)malloc(sizeof(Symbol));
+                // symbol_init(tmp);
+                // tmp->kind = VARIABLE;
+                // tmp->u.variable_type = ret->u.function_type->ret_type;
+                // free(ret);
+                // return tmp;
+                printf("Error type 1 at Line %d: Undefined variable \"%s\".\n", c->line_no, c->nodeval.type_str);
+                return NULL;
             }else return ret;
         } else {
             if (strcmp(c->right->node_type, "LP") || c->right->right == NULL) {
-                printf("error\n");
+                printf("error 2\n");
                 return NULL;
             }
             Symbol* func = find_symbol(c->nodeval.type_str);
             if (func == NULL) {
-                printf("Error Type 2 at Line %d: Undefined function \"%s\".\n", c->line_no, c->nodeval.type_str);
+                printf("Error type 2 at Line %d: Undefined function \"%s\".\n", c->line_no, c->nodeval.type_str);
                 return NULL;
             }
             Function* func_type = func->u.function_type;
@@ -429,12 +437,13 @@ Symbol* exp_process(TreeNode* c) {
             TreeNode* tmp = c->right->right;
             if (strcmp(tmp->node_type, "Args") == 0) {
                 if (args_comp(func_type->param_p, tmp)) {
+                    // printf("args: %d\n", func_type->param_num);
                     printf("Error type 9 at Line %d: Function \"%s\" is not applicable for the arguments.\n", c->line_no, func->name);
                     return NULL;
                 }
             } else {
                 if (strcmp(tmp->node_type, "RP")) {
-                    printf("error");
+                    printf("error 3");
                     return NULL;
                 }
                 if (func_type->param_num) {
@@ -466,19 +475,19 @@ Symbol* exp_process(TreeNode* c) {
     if (strcmp(c->node_type, "LP") == 0) {
         if (c->right == NULL || strcmp(c->right->node_type, "Exp") || c->right->right == NULL ||
         strcmp(c->right->right->node_type, "RP")) {
-            printf("error\n");
+            printf("error 4\n");
             return NULL;
         }
         return exp_process(c->right);
     }
     if (strcmp(c->node_type, "MINUS") == 0) {
         if (c->right == NULL || strcmp(c->right->node_type, "Exp")) {
-            printf("error\n");
+            printf("error 5\n");
             return NULL;
         }
         Symbol* ret = exp_process(c->right);
         if (ret != NULL && ret->kind != BASIC) {
-            printf("Error type 7 at Line %d: Type mismathed for operands.\n", c->line_no);
+            printf("Error type 7 at Line %d: Type mismathed for operands \"-\".\n", c->line_no);
             free(ret);
             return NULL;
         }
@@ -486,12 +495,12 @@ Symbol* exp_process(TreeNode* c) {
     }
     if (strcmp(c->node_type, "NOT") == 0) {
         if (c->right == NULL || strcmp(c->right->node_type, "Exp")) {
-            printf("error\n");
+            printf("error 6\n");
             return NULL;
         }
         Symbol* ret = exp_process(c->right);
-        if (ret != NULL && (ret->kind != BASIC || type_comp(ret->u.variable_type, float_type))) {
-            printf("Error type 7 at Line %d: Type mismathed for operands.\n", c->line_no);
+        if (ret != NULL && (ret->kind != BASIC || type_comp(ret->u.variable_type, int_type))) {
+            printf("Error type 7 at Line %d: Type mismathed for operands \"!\".\n", c->line_no);
             free(ret);
             return NULL;
         }
@@ -506,7 +515,7 @@ Symbol* exp_process(TreeNode* c) {
         }
         Type* exp_type = exp_sym->u.variable_type;
         if (tmp == NULL) {
-            printf("error\n");
+            printf("error 7\n");
             return NULL;
         }
         if (strcmp(tmp->node_type, "LB") == 0) {
@@ -517,7 +526,7 @@ Symbol* exp_process(TreeNode* c) {
             }
             if (tmp->right == NULL || strcmp(tmp->right->node_type, "Exp") ||
             tmp->right->right == NULL || strcmp(tmp->right->right->node_type, "RB")) {
-                printf("error\n");
+                printf("error 8\n");
                 free(exp_sym);
                 return NULL;
             }
@@ -543,12 +552,12 @@ Symbol* exp_process(TreeNode* c) {
         }
         if (strcmp(tmp->node_type, "DOT") == 0) {
             if (exp_type->kind != STRUCTURE) {
-                printf("Error type 13 at Line %d: Illegal use of \".\".", c->line_no);
+                printf("Error type 13 at Line %d: Illegal use of \".\".\n", c->line_no);
                 free(exp_sym);
                 return NULL;
             }
             if (tmp->right == NULL || strcmp(tmp->right->node_type, "ID")) {
-                printf("error\n");
+                printf("error 9\n");
                 free(exp_sym);
                 return NULL;
             }
@@ -561,7 +570,7 @@ Symbol* exp_process(TreeNode* c) {
             return ret;
         }
         if (tmp->right == NULL || strcmp(tmp->right->node_type, "Exp")) {
-            printf("error\n");
+            printf("error 10\n");
             free(exp_sym);
             return NULL;
         }
@@ -574,7 +583,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "AND") == 0) {
             if (!(exp_type->kind == BASIC && exp_type->u.basic == 0 &&
             exp2_type->kind == BASIC && exp2_type->u.basic == 0)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"&&\".\n", c->line_no);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -585,7 +594,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "OR") == 0) {
             if (!(exp_type->kind == BASIC && exp_type->u.basic == 0 &&
             exp2_type->kind == BASIC && exp2_type->u.basic == 0)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"||\".\n", c->line_no);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -596,7 +605,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "RELOP") == 0) {
             if (!(exp_type->kind == BASIC && exp2_type->kind == BASIC &&
             exp_type->u.basic == exp2_type->u.basic)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"%s\".\n", c->line_no,tmp->nodeval.type_str);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -612,7 +621,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "PLUS") == 0) {
             if (!(exp_type->kind == BASIC && exp2_type->kind == BASIC &&
             exp_type->u.basic == exp2_type->u.basic)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"+\".\n", c->line_no);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -623,7 +632,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "MINUS") == 0) {
             if (!(exp_type->kind == BASIC && exp2_type->kind == BASIC &&
             exp_type->u.basic == exp2_type->u.basic)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"-\".\n", c->line_no);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -634,7 +643,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "STAR") == 0) {
             if (!(exp_type->kind == BASIC && exp2_type->kind == BASIC &&
             exp_type->u.basic == exp2_type->u.basic)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"*\".\n", c->line_no);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -645,7 +654,7 @@ Symbol* exp_process(TreeNode* c) {
         if (strcmp(tmp->node_type, "DIV") == 0) {
             if (!(exp_type->kind == BASIC && exp2_type->kind == BASIC &&
             exp_type->u.basic == exp2_type->u.basic)) {
-                printf("Error type 7 at Line %d: Type mismatched for operands.\n", c->line_no);
+                printf("Error type 7 at Line %d: Type mismatched for operands \"/\".\n", c->line_no);
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -655,7 +664,7 @@ Symbol* exp_process(TreeNode* c) {
         }
         if (strcmp(tmp->node_type, "ASSIGNOP") == 0) {
             if (c->left == NULL) {
-                printf("error\n");
+                printf("error 11\n");
                 free(exp_sym);
                 free(exp2_sym);
                 return NULL;
@@ -683,15 +692,15 @@ Symbol* exp_process(TreeNode* c) {
             return ret;
         }
     }
-    printf("error\n");
+    printf("error 12 %s\n", c->node_type);
     return NULL;
 }
 
-void compst_process(TreeNode* c, Type* t) {
+void compst_process(TreeNode* c, Type* t, int flag) {
     if (strcmp(c->node_type, "Def") == 0) {
         def_process(c, NULL);
         if (c->right != NULL) {
-            compst_process(c->right, t);
+            compst_process(c->right, t, 0);
         }
         return;
     }
@@ -701,6 +710,7 @@ void compst_process(TreeNode* c, Type* t) {
             return;
         }
         Symbol* exp_sym = exp_process(c->right);
+        if (exp_sym == NULL) return;
         if (type_comp(t, exp_sym->u.variable_type)) {
             printf("Error type 8 at Line %d: Type mismatched for return.\n", c->line_no);
         }
@@ -712,19 +722,60 @@ void compst_process(TreeNode* c, Type* t) {
         // printf("in compst exp\n");
         if (exp_sym != NULL) free(exp_sym);
         if (c->right != NULL) {
-            compst_process(c->right, t);
+            compst_process(c->right, t, 0);
         }
         return;
     }
+    if (strcmp(c->node_type, "IF") == 0) {
+        if (c->right == NULL || strcmp(c->right->node_type, "LP") || 
+        c->right->right == NULL || strcmp(c->right->right->node_type, "Exp")) {
+            printf("error\n");
+            return;
+        }
+        Symbol* exp_sym = exp_process(c->right->right);
+        if (exp_sym != NULL && (exp_sym->u.variable_type->kind != BASIC || exp_sym->u.variable_type->u.basic != 0)) {
+            printf("Error type 7 at Line %d: There should be an int variable after IF.\n", c->line_no);
+        }
+        free(exp_sym);
+        if (c->right->right->right != NULL) {
+            compst_process(c->right->right->right, t, 0);
+        }
+        return;
+    }
+    if (strcmp(c->node_type, "WHILE") == 0) {
+        if (c->right == NULL || strcmp(c->right->node_type, "LP") || 
+        c->right->right == NULL || strcmp(c->right->right->node_type, "Exp")) {
+            printf("error\n");
+            return;
+        }
+        Symbol* exp_sym = exp_process(c->right->right);
+        if (exp_sym != NULL && (exp_sym->u.variable_type->kind != BASIC || exp_sym->u.variable_type->u.basic != 0)) {
+            printf("Error type 7 at Line %d: There should be an int variable after WHILE.\n", c->line_no);
+        }
+        free(exp_sym);
+        if (c->right->right->right != NULL) {
+            compst_process(c->right->right->right, t, 0);
+        }
+        return;
+    }
+    if (strcmp(c->node_type, "CompSt") == 0) {
+        if (!flag) push_symbolstack();
+        if (c->left != NULL) {
+            compst_process(c->left, t, 0);
+        }
+        if (!flag) pop_symbolstack();
+        return;
+    }
     if (c->left != NULL) {
-        compst_process(c->left, t);
+        compst_process(c->left, t, 0);
     }
     if (c->right != NULL) {
-        compst_process(c->right, t);
+        compst_process(c->right, t, 0);
     }
 }
 
 Type *find_structure(char *name) {
+    if (name == NULL) return NULL;
     StructList *tmp = str_list;
     while (tmp != NULL) {
         if (tmp->structure->u.structure.name != NULL && strcmp(tmp->structure->u.structure.name, name) == 0) 
@@ -748,6 +799,7 @@ void add_structure(Type* s) {
 }
 
 Symbol *find_symbol(char* name) {
+    if (name == NULL) return NULL;
     SymbolStack * tmp = sym_st;
     while (tmp != NULL) {
         Symbol* ret = find_symbol_atlevel(tmp, name);
@@ -758,6 +810,7 @@ Symbol *find_symbol(char* name) {
 }
 
 Symbol *find_symbol_atlevel(SymbolStack* s, char *name) {
+    if (name == NULL) return NULL;
     Symbol* ret = s->root;
     while (ret != NULL) {
         if (strcmp(ret->name, name) == 0) return ret;
@@ -770,6 +823,16 @@ void add_symbol(Symbol *s) {
     Symbol *tmp = sym_st->root;
     if (tmp == NULL) {
         sym_st->root = s;
+        return;
+    }
+    while (tmp->nxt != NULL) tmp = tmp->nxt;
+    tmp->nxt = s;
+}
+
+void add_symbol_atlevel(SymbolStack* ss, Symbol* s) {
+    Symbol *tmp = ss->root;
+    if (tmp == NULL) {
+        ss->root = s;
         return;
     }
     while (tmp->nxt != NULL) tmp = tmp->nxt;
@@ -797,6 +860,15 @@ void pop_symbolstack() {
     free(tmp);
 }
 
+Symbol* top_symbolstack() {
+    SymbolStack* st = sym_st;
+    while (st->root == NULL && st->nxt != NULL) st = st->nxt;
+    if (st->root == NULL) return NULL;
+    Symbol* ret = st->root;
+    while (ret->nxt != NULL) ret = ret->nxt;
+    return ret;
+}
+
 void add_func_param(Function* f, Symbol* s) {
     f->param_num++;
     FieldList* field = (FieldList*) malloc(sizeof(FieldList));
@@ -806,8 +878,21 @@ void add_func_param(Function* f, Symbol* s) {
     FieldList* tmp = f->param_p;
     if (tmp == NULL) {
         f->param_p = field;
+    } else {
+        while (tmp->tail != NULL) tmp = tmp->tail;
+        tmp->tail = field;
     }
-    else {
+}
+
+void add_struct_field(Type* t, Symbol* s) {
+    FieldList* field = (FieldList*)malloc(sizeof(FieldList));
+    fieldlist_init(field);
+    field->name = s->name;
+    field->type = s->u.variable_type;
+    FieldList* tmp = t->u.structure.first;
+    if (tmp == NULL) {
+        t->u.structure.first = field;
+    } else {
         while (tmp->tail != NULL) tmp = tmp->tail;
         tmp->tail = field;
     }
@@ -818,7 +903,7 @@ void function_test() {
     while (tmp != NULL) {
         // printf("%s\n", tmp->name);
         if (tmp->kind == FUNC && tmp->u.function_type->is_def == 0) {
-            printf("Error type 18 at Line %d: Undefined function\"%s\"\n", tmp->u.function_type->line_no, tmp->name);
+            printf("Error type 18 at Line %d: Undefined function \"%s\".\n", tmp->u.function_type->line_no, tmp->name);
         }
         tmp = tmp->nxt;
     }
@@ -846,7 +931,8 @@ int args_comp(FieldList* f, TreeNode* c) {
         return 1;
     }
     Symbol* exp_sym = exp_process(c->left);
-    if (exp_sym == NULL || exp_sym->u.variable_type) return 1;
+    // printf("comp: %d\n", exp_sym->u.variable_type->u.basic);
+    if (exp_sym == NULL) return 1;
     if (type_comp(f->type, exp_sym->u.variable_type)) {
         free(exp_sym);
         return 1;
@@ -890,7 +976,7 @@ int func_comp(const Symbol* a, const Symbol* b) {
             // printf("%s %s\n", a1->type->u.structure.name, b1->type->u.structure.name);
             return 1;
         }
-        if (strcmp(a1->name, b1->name)) return 1;
+        // if (strcmp(a1->name, b1->name)) return 1;
         a1 = a1->tail;
         b1 = b1->tail;
     }

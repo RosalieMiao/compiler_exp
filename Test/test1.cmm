@@ -1,6 +1,10 @@
+int func(int a);
+
+int func(int a)
+{
+  return 1;
+}
+
 int main()
 {
-	int i = 1;
-	int j = 2;
-	i < j;
 }

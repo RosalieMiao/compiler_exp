@@ -100,23 +100,26 @@ void extdef_process(TreeNode* c);
 void extdeclist_process(TreeNode* c, Type* t);
 Type* specifier_process(TreeNode *c);
 Symbol* fundec_process(TreeNode* c, Type* t);
-int deflist_process(TreeNode* c, FieldList* s);//返回0：非空 返回1：空
-void declist_process(TreeNode* c, Type* t, FieldList* s);
+int deflist_process(TreeNode* c, Type* st);//返回0：非空 返回1：空
+void declist_process(TreeNode* c, Type* t, Type* st);
 //vardec_process须判断是不是数组，是数组时调用
-void vardec_process(TreeNode* c, Type* t, FieldList* s, Function* f);
-void def_process(TreeNode* c, FieldList* s);
+void vardec_process(TreeNode* c, Type* t, Type* st, Function* f);
+void def_process(TreeNode* c, Type* st);
 void varlist_process(TreeNode* c, Function* f);
 Symbol* exp_process(TreeNode* c);
-void compst_process(TreeNode* c, Type* t);
+void compst_process(TreeNode* c, Type* t, int flag);
 
 Type *find_structure(char *name);
 void add_structure(Type* s);
 Symbol* find_symbol(char *name); //返回NULL为没找到
 Symbol* find_symbol_atlevel(SymbolStack* s, char* name);
 void add_symbol(Symbol *s);
+void add_symbol_atlevel(SymbolStack* ss, Symbol* s);
 void push_symbolstack();
 void pop_symbolstack();
+Symbol* top_symbolstack();
 void add_func_param(Function* f, Symbol* s);
+void add_struct_field(Type* t, Symbol* s);
 void function_test();
 
 Symbol* structure_dot_find(FieldList* f, char *name);
