@@ -102,7 +102,6 @@ Type* specifier_process(TreeNode *c);
 Symbol* fundec_process(TreeNode* c, Type* t);
 int deflist_process(TreeNode* c, Type* st);//返回0：非空 返回1：空
 void declist_process(TreeNode* c, Type* t, Type* st);
-//vardec_process须判断是不是数组，是数组时调用
 void vardec_process(TreeNode* c, Type* t, Type* st, Function* f);
 void def_process(TreeNode* c, Type* st);
 void varlist_process(TreeNode* c, Function* f);

@@ -24,13 +24,6 @@ void my_dfs(TreeNode *c) {
         }
         return;
     }
-    if (strcmp(c->node_type, "Def") == 0) {
-        def_process(c, NULL);
-        if (c->right != NULL) {
-            my_dfs(c->right);
-        }
-        return;
-    }
     if (c->left != NULL) my_dfs(c->left);
     if (c->right != NULL) my_dfs(c->right);
 }
@@ -61,8 +54,6 @@ void extdef_process(TreeNode* c) {
         }
         push_symbolstack();
         Symbol* func = fundec_process(c, t);
-        // printf("func:%s\n", func->u.function_type->param_p->type->u.structure.name);
-        // c = c->right;
         TreeNode* tmp = c->right;
         if (strcmp(tmp->node_type, "SEMI") == 0) {
             Symbol* tmp_sym = find_symbol(func->name);
@@ -158,8 +149,6 @@ Type* specifier_process(TreeNode *c) {
             ret->kind = STRUCTURE;
             ret->u.structure.first = NULL;
             ret->u.structure.name = NULL;
-            // FieldList* structure = (FieldList*)malloc(sizeof(FieldList));
-            // fieldlist_init(structure);
             if (tmp->left == NULL) ret->u.structure.name = NULL;
             else ret->u.structure.name = tmp->left->nodeval.type_str;
             tmp = tmp->right;
@@ -178,15 +167,11 @@ Type* specifier_process(TreeNode *c) {
             }
             deflist_process(tmp, ret);
             pop_symbolstack();
-            // ret->u.structure.first = structure;
             if (find_structure(ret->u.structure.name) != NULL || find_symbol(ret->u.structure.name) != NULL) {
-                // if (find_structure(ret->u.structure.name) != NULL) printf("?????\n");
-                // print_structlist();
                 printf("Error type 16 at Line %d: Duplicated name \"%s\".\n", c->left->left->right->left->line_no, ret->u.structure.name);
                 free(ret);
                 return NULL;
             } else {
-                // printf("AAAA\n");
                 add_structure(ret);
                 return ret;
             }
@@ -247,16 +232,6 @@ int deflist_process(TreeNode* c, Type* st) {//st = NULL : 非结构体定义时
         printf("error\n");
         return 1;
     }
-    // if (st != NULL) {
-    //     FieldList* new_field = (FieldList*) malloc(sizeof(FieldList));
-    //     fieldlist_init(new_field);
-    //     if (deflist_process(c->right, new_field)) {
-    //         free(new_field);
-    //         s->tail = NULL;
-    //     } else {s->tail = new_field;}
-    // } else {
-    //     deflist_process(c->right, st);
-    // }
     deflist_process(c->right, st);
     return 0;
 }
@@ -395,7 +370,6 @@ Symbol* exp_process(TreeNode* c) {
         return NULL;
     }
     c = c->left;
-    // printf("%s\n", c->node_type);
     if (strcmp(c->node_type, "ID") == 0) {
         if (c->right == NULL) {
             Symbol* exp_sym = find_symbol(c->nodeval.type_str);
@@ -406,12 +380,6 @@ Symbol* exp_process(TreeNode* c) {
             Symbol* ret = (Symbol*)malloc(sizeof(Symbol));
             memcpy(ret, exp_sym, sizeof(Symbol));
             if (ret->kind == FUNC) {
-                // Symbol* tmp = (Symbol*)malloc(sizeof(Symbol));
-                // symbol_init(tmp);
-                // tmp->kind = VARIABLE;
-                // tmp->u.variable_type = ret->u.function_type->ret_type;
-                // free(ret);
-                // return tmp;
                 printf("Error type 1 at Line %d: Undefined variable \"%s\".\n", c->line_no, c->nodeval.type_str);
                 return NULL;
             }else return ret;
@@ -437,7 +405,6 @@ Symbol* exp_process(TreeNode* c) {
             TreeNode* tmp = c->right->right;
             if (strcmp(tmp->node_type, "Args") == 0) {
                 if (args_comp(func_type->param_p, tmp)) {
-                    // printf("args: %d\n", func_type->param_num);
                     printf("Error type 9 at Line %d: Function \"%s\" is not applicable for the arguments.\n", c->line_no, func->name);
                     return NULL;
                 }
@@ -719,7 +686,6 @@ void compst_process(TreeNode* c, Type* t, int flag) {
     }
     if (strcmp(c->node_type, "Exp") == 0) {
         Symbol* exp_sym = exp_process(c);
-        // printf("in compst exp\n");
         if (exp_sym != NULL) free(exp_sym);
         if (c->right != NULL) {
             compst_process(c->right, t, 0);
@@ -901,7 +867,6 @@ void add_struct_field(Type* t, Symbol* s) {
 void function_test() {
     Symbol* tmp = sym_st->root;
     while (tmp != NULL) {
-        // printf("%s\n", tmp->name);
         if (tmp->kind == FUNC && tmp->u.function_type->is_def == 0) {
             printf("Error type 18 at Line %d: Undefined function \"%s\".\n", tmp->u.function_type->line_no, tmp->name);
         }
@@ -931,7 +896,6 @@ int args_comp(FieldList* f, TreeNode* c) {
         return 1;
     }
     Symbol* exp_sym = exp_process(c->left);
-    // printf("comp: %d\n", exp_sym->u.variable_type->u.basic);
     if (exp_sym == NULL) return 1;
     if (type_comp(f->type, exp_sym->u.variable_type)) {
         free(exp_sym);
@@ -972,11 +936,8 @@ int func_comp(const Symbol* a, const Symbol* b) {
     while (a1 != NULL) {
         if (b1 == NULL) return 1;
         if (type_comp(a1->type, b1->type)) {
-            // if (b1->type->kind != a1->type->kind) printf("a?:%d %d\n", a1->type->kind, b1->type->kind);
-            // printf("%s %s\n", a1->type->u.structure.name, b1->type->u.structure.name);
             return 1;
         }
-        // if (strcmp(a1->name, b1->name)) return 1;
         a1 = a1->tail;
         b1 = b1->tail;
     }
