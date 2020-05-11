@@ -1,6 +1,7 @@
 #include<stdio.h>
 extern FILE* yyin;
 extern int yylineno;
+extern void print_ir(char* out);
 
 int main(int argc, char** argv) {
 	if (argc <= 1) return 1;
@@ -13,5 +14,6 @@ int main(int argc, char** argv) {
 	yylineno = 1;
 	yyrestart(f);
 	yyparse();
+	print_ir(argv[2]);
 	return 0;
 }

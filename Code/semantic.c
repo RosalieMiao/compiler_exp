@@ -1,4 +1,4 @@
-#include "head.h"
+#include "semantic.h"
 
 void start_semantics(TreeNode *c) {
     sym_st = (SymbolStack*) malloc(sizeof(SymbolStack));
@@ -819,6 +819,18 @@ void pop_symbolstack() {
     sym_st->pre = NULL;
     Symbol *tmp1 = tmp->root;
     while (tmp1 != NULL) {
+        if (tmp1->kind == VARIABLE) {
+            //将数组的类型也清空
+            Type* t = tmp1->u.variable_type;
+            while (t->kind == ARRAY) {
+                Type* ttmp = t->u.array.elem;
+                free(t);
+                t = ttmp;
+            }
+            if (t->kind == STRUCTURE && t->u.structure.name == NULL) {
+                free(t)
+            }
+        }
         Symbol *tmp2 = tmp1->nxt;
         free(tmp1);
         tmp1 = tmp2;

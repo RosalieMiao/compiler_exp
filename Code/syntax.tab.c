@@ -69,7 +69,7 @@
 #line 1 "./syntax.y" /* yacc.c:337  */
 
     #include "lex.yy.c"
-    #include "head.h"
+    #include "syntax.h"
 
 #line 75 "./syntax.tab.c" /* yacc.c:337  */
 # ifndef YY_NULLPTR

@@ -1,6 +1,6 @@
 %{
     #include "lex.yy.c"
-    #include "head.h"
+    #include "syntax.h"
 %}
 
 %union {
@@ -41,6 +41,8 @@ Program: ExtDefList {
     }*/
     if (!err_flag) {
         start_semantics($$);
+        translate_init();
+        start_cal_ir($$);
     }
 }
     ;
