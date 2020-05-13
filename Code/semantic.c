@@ -10,10 +10,46 @@ void start_semantics(TreeNode *c) {
     int_type->u.basic = 0;
     float_type->kind = BASIC;
     float_type->u.basic = 1;
-    my_dfs(c);  
-    function_test();
+
     // print_structlist();
     // print_symbol();
+    //read 和 write函数
+    Symbol* read = (Symbol*) malloc(sizeof(Symbol));
+    symbol_init(read);
+    read->kind = FUNC;
+    read->name = (char*) malloc(10);
+    // read->name = "read";
+    strcpy(read->name, "read");
+    Function* readfunc = (Function*) malloc(sizeof(Function));
+    function_init(readfunc);
+    readfunc->is_def = 1;
+    readfunc->line_no = 0;
+    readfunc->param_num = 0;
+    readfunc->ret_type = int_type;
+    read->u.function_type = readfunc;
+    add_symbol(read);
+
+    Symbol* write = (Symbol*) malloc(sizeof(Symbol));
+    symbol_init(write);
+    write->kind = FUNC;
+    write->name = (char*) malloc(10);
+    strcpy(write->name, "write");
+    Function* writefunc = (Function*) malloc(sizeof(Function));
+    function_init(writefunc);
+    writefunc->is_def = 1;
+    writefunc->line_no = 0;
+    writefunc->param_num = 1;
+    writefunc->param_p = (FieldList*) malloc(sizeof(FieldList));
+    writefunc->param_p->tail = NULL;
+    writefunc->param_p->type = int_type;
+    writefunc->param_p->name = (char*)malloc(20);
+    strcpy(writefunc->param_p->name, "write_param");
+    writefunc->ret_type = int_type;
+    write->u.function_type = writefunc;
+    add_symbol(write);
+
+    my_dfs(c);  
+    function_test();
 }
 
 void my_dfs(TreeNode *c) {
@@ -776,6 +812,7 @@ Symbol *find_symbol(char* name) {
 }
 
 Symbol *find_symbol_atlevel(SymbolStack* s, char *name) {
+    // printf("atlevel\n");
     if (name == NULL) return NULL;
     Symbol* ret = s->root;
     while (ret != NULL) {
@@ -828,7 +865,7 @@ void pop_symbolstack() {
                 t = ttmp;
             }
             if (t->kind == STRUCTURE && t->u.structure.name == NULL) {
-                free(t)
+                free(t);
             }
         }
         Symbol *tmp2 = tmp1->nxt;
@@ -1005,11 +1042,11 @@ void fieldlist_init(FieldList* f) {
 }
 
 void function_init(Function* f) {
-    f->is_def = 0;
     f->param_num = 0;
     f->param_p = NULL;
     f->is_def = 0;
     f->line_no = 0;
+    f->ret_type = NULL;
 }
 
 void structlist_init(StructList* s) {

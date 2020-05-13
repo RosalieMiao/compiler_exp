@@ -10,10 +10,13 @@ int main(int argc, char** argv) {
 		perror(argv[1]);
 		return 1;
 	}
-	/*FILE* f = fopen("../Test/test1.cmm", "r");*/
+	// FILE* f = fopen("../Test/test1.cmm", "r");
 	yylineno = 1;
+	// printf("aaaaa\n");
 	yyrestart(f);
+	// printf("BBBBBBBBBB\n");
 	yyparse();
 	print_ir(argv[2]);
+	// print_ir("out.ir");
 	return 0;
 }

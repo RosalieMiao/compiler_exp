@@ -1,14 +1,13 @@
-#include "head.h"
+// #include "head.h"
 #include "semantic.h"
 
 typedef struct Operand_ Operand;
 typedef struct InterCode_ InterCode;
 typedef struct InterCodes_ InterCodes;
 typedef struct ArgsList_ ArgsList;
-typedef struct TypePackage_ TypePackage;
 
 struct Operand_ {
-    enum { VARIABLE, CONSTANT, FETCH, ADDRESS } kind;
+    enum { NAME, CONSTANT, FETCH, ADDRESS } kind;
     union {
         char var_name[45];//非临时变量加前缀v_，临时变量为t1 t2 ...
         int value;
@@ -37,38 +36,32 @@ struct InterCodes_ {
     InterCode code;
     InterCodes *pre;
     InterCodes *nxt;
-    InterCodes *tail;
 };
 
 struct ArgsList_ {
     char name[45];
-    ArgsList *nxt;
+    int is_addr;
+    ArgsList* nxt;
 };
 
-struct TypePackage_ {
-    Type* t;
-};
 
-InterCodes *ir_root;
+InterCodes *ir_root, *ir_now;
 int temp_id;
 int label_id;
 
-
-int new_temp();
+void new_temp(char* place);
 InterCodes* new_label();
-
-InterCodes* translate_Stmt(TreeNode* c);
-InterCodes* translate_Cond(TreeNode* c, InterCodes* label_ture, InterCodes* label_false);
-InterCodes* translate_Exp(TreeNode* c, char* place);
-InterCodes* translate_CompSt(TreeNode* c);
-InterCodes* translate_Args(TreeNode* c, ArgsList *l);
-
+void ir_append(InterCodes* ir);
 InterCodes* new_intercodes();
-void free_args(ArgsList *l);
-InterCodes* gen_gt(InterCodes* label);
-void connect_intercodes(InterCodes* code1, InterCodes* code2);
-InterCodes* calculate_address(TreeNode* c, char* basic_addr, TypePackage* tp);
-
-
-
+void free_argslist(ArgsList* l);
 int type_size(Type* t);
+int get_relop(TreeNode* c);
+
+Type* translate_exp(TreeNode* c, char* place);
+ArgsList* translate_args(TreeNode* c, ArgsList* l);
+void translate_cond(TreeNode* c, char* label_true, char* label_false);
+void translate_compst(TreeNode* c);
+void translate_stmt(TreeNode* c);
+
+void print_op_test(Operand op);
+void print_test(InterCodes* c);
