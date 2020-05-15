@@ -65,3 +65,5 @@ void translate_stmt(TreeNode* c);
 
 void print_op_test(Operand op);
 void print_test(InterCodes* c);
+
+void delete_ir(InterCodes* c);

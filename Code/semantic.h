@@ -40,6 +40,7 @@ struct Symbol_ {
 		//函数
 		Function* function_type;
 	} u;
+	int is_param;
 	Symbol* nxt;
 };
 

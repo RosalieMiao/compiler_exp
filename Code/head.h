@@ -24,3 +24,4 @@ void start_semantics(TreeNode *c);
 
 void translate_init();
 void start_cal_ir(TreeNode* c);
+void optimize_ir();

@@ -170,12 +170,12 @@ Type* specifier_process(TreeNode *c) {
         else return float_type;
     } else {//tmp: StructSpecifier
         if (strcmp(tmp->node_type, "StructSpecifier") || tmp->left == NULL) {
-            printf("error\n");
+            printf("error1 %s\n", tmp->node_type);
             return NULL;
         }
         tmp = tmp->left;
         if (strcmp(tmp->node_type, "STRUCT") || tmp->right == NULL) {
-            printf("error\n");
+            printf("error2\n");
             return NULL;
         }
         tmp = tmp->right;
@@ -189,14 +189,14 @@ Type* specifier_process(TreeNode *c) {
             else ret->u.structure.name = tmp->left->nodeval.type_str;
             tmp = tmp->right;
             if (tmp == NULL || strcmp(tmp->node_type, "LC")) {
-                printf("error\n");
+                printf("error3\n");
                 free(ret);
                 return NULL;
             }
             push_symbolstack();
             tmp = tmp->right;
             if (tmp == NULL || strcmp(tmp->node_type, "DefList")) {
-                printf("error\n");
+                printf("error4\n");
                 pop_symbolstack();
                 free(ret);
                 return NULL;
@@ -213,7 +213,7 @@ Type* specifier_process(TreeNode *c) {
             }
         } else {
             if (strcmp(tmp->node_type, "Tag") || tmp->left == NULL || strcmp(tmp->left->node_type, "ID")) {
-                printf("error\n");
+                printf("error5\n");
                 return NULL;
             }
             Type* ret = find_structure(tmp->left->nodeval.type_str);
@@ -523,7 +523,7 @@ Symbol* exp_process(TreeNode* c) {
         }
         if (strcmp(tmp->node_type, "LB") == 0) {
             if (exp_type->kind != ARRAY) {
-                printf("Error type 10 at Line %d: The variable is not an array.\n", c->line_no);
+                printf("Error type 10 at Line %d: The variable %s is not an array.\n", c->line_no, exp_sym->name);
                 free(exp_sym);
                 return NULL;
             }
@@ -856,18 +856,6 @@ void pop_symbolstack() {
     sym_st->pre = NULL;
     Symbol *tmp1 = tmp->root;
     while (tmp1 != NULL) {
-        if (tmp1->kind == VARIABLE) {
-            //将数组的类型也清空
-            Type* t = tmp1->u.variable_type;
-            while (t->kind == ARRAY) {
-                Type* ttmp = t->u.array.elem;
-                free(t);
-                t = ttmp;
-            }
-            if (t->kind == STRUCTURE && t->u.structure.name == NULL) {
-                free(t);
-            }
-        }
         Symbol *tmp2 = tmp1->nxt;
         free(tmp1);
         tmp1 = tmp2;
@@ -1028,6 +1016,7 @@ void symbol_init(Symbol* s) {
     s->name = NULL;
     s->kind = VARIABLE;
     s->u.variable_type = NULL;
+    s->is_param = 0;
 }
 
 void type_init(Type* t) {

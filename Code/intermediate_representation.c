@@ -25,18 +25,31 @@ void start_cal_ir(TreeNode *c) {
             while (1) {
                 Type* type1 = specifier_process(paramdec_c->left);
                 TreeNode* vardec_c = paramdec_c->left->right;
-                code1 = new_intercodes();
-                code1->code.kind = PARAM;
-                if (strcmp(vardec_c->node_type, "ID") == 0 && type1->kind == BASIC) {
+                if (strcmp(vardec_c->left->node_type, "ID")) {
+                    vardec_process(vardec_c, type1, NULL, NULL);
+                    Symbol* sym = top_symbolstack();
+                    sym->is_param = 1;
+                    code1 = new_intercodes();
+                    code1->code.kind = PARAM;
                     code1->code.u.op.kind = NAME;
+                    sprintf(code1->code.u.op.u.var_name, "v_%s", sym->name);
+                    ir_append(code1);
                 } else {
-                    code1->code.u.op.kind = FETCH;
-                    while (strcmp(vardec_c->left->node_type, "ID") != 0) {
-                        vardec_c = vardec_c->left;
+                    if (type1->kind == STRUCTURE) {
+                        Symbol* sym = (Symbol*) malloc(sizeof(Symbol));
+                        symbol_init(sym);
+                        sym->kind = VARIABLE;
+                        sym->name=vardec_c->left->nodeval.type_str;
+                        sym->u.variable_type = type1;
+                        sym->is_param = 1;
+                        add_symbol(sym);
                     }
+                    code1 = new_intercodes();
+                    code1->code.kind = PARAM;
+                    code1->code.u.op.kind = NAME;
+                    sprintf(code1->code.u.op.u.var_name, "v_%s", vardec_c->left->nodeval.type_str);
+                    ir_append(code1);
                 }
-                sprintf(code1->code.u.op.u.var_name, "v_%s", vardec_c->left->nodeval.type_str);
-                ir_append(code1);
                 if (paramdec_c->right == NULL) break;
                 else paramdec_c = paramdec_c->right->right->left;
             }
@@ -53,34 +66,45 @@ void start_cal_ir(TreeNode *c) {
 }
 
 Type* translate_exp(TreeNode* c, char* place) {
-    if (strcmp(c->left->node_type, "INT") == 0) {
-        InterCodes* code1 = new_intercodes();
-        code1->code.kind = ASSIGN;
-        code1->code.u.assign.left.kind = NAME;
-        strcpy(code1->code.u.assign.left.u.var_name, place);
-        code1->code.u.assign.right.kind = CONSTANT;
-        code1->code.u.assign.right.u.value = c->left->nodeval.type_int;
-        ir_append(code1);
-        return int_type;
+    if (strcmp(c->left->node_type, "LP") == 0) {
+        return translate_exp(c->left->right, place);
     }
-    if (strcmp(c->left->node_type, "ID") == 0) {
-        if (c->left->right == NULL) {
-            Symbol* sym = find_symbol(c->left->nodeval.type_str);
+    if (strcmp(c->left->node_type, "INT") == 0) {
+        if (place != NULL) {
             InterCodes* code1 = new_intercodes();
             code1->code.kind = ASSIGN;
             code1->code.u.assign.left.kind = NAME;
             strcpy(code1->code.u.assign.left.u.var_name, place);
-            if (sym == NULL) {
-                code1->code.u.assign.right.kind = NAME;
-                sprintf(code1->code.u.assign.right.u.var_name, "v_%s", c->left->nodeval.type_str);
-                ir_append(code1);
-                return int_type;
-            } else {
-                code1->code.u.assign.right.kind = FETCH;
-                sprintf(code1->code.u.assign.right.u.var_name, "v_%s", sym->name);
-                ir_append(code1);
-                return sym->u.variable_type;
+            code1->code.u.assign.right.kind = CONSTANT;
+            code1->code.u.assign.right.u.value = c->left->nodeval.type_int;
+            ir_append(code1);
+        }
+        return int_type;
+    }
+    if (strcmp(c->left->node_type, "ID") == 0) {
+        if (c->left->right == NULL) {
+            if (place != NULL) {
+                Symbol* sym = find_symbol(c->left->nodeval.type_str);
+                InterCodes* code1 = new_intercodes();
+                code1->code.kind = ASSIGN;
+                code1->code.u.assign.left.kind = NAME;
+                strcpy(code1->code.u.assign.left.u.var_name, place);
+                if (sym == NULL) {
+                    // printf("id: %s\n", c->left->nodeval.type_str);
+                    code1->code.u.assign.right.kind = NAME;
+                    sprintf(code1->code.u.assign.right.u.var_name, "v_%s", c->left->nodeval.type_str);
+                    ir_append(code1);
+                    return int_type;
+                } else {
+                    if (sym->is_param) {
+                        code1->code.u.assign.right.kind = NAME;
+                    } else code1->code.u.assign.right.kind = FETCH;
+                    sprintf(code1->code.u.assign.right.u.var_name, "v_%s", sym->name);
+                    ir_append(code1);
+                    return sym->u.variable_type;
+                }
             }
+            return int_type;
         } else {
             if (strcmp(c->left->right->right->node_type, "Args") == 0) {
                 ArgsList* l = (ArgsList*) malloc(sizeof(ArgsList));
@@ -92,6 +116,15 @@ Type* translate_exp(TreeNode* c, char* place) {
                     code1->code.u.op.kind = NAME;
                     strcpy(code1->code.u.op.u.var_name,l->name);
                     ir_append(code1);
+                    if (place != NULL) {
+                        code1 = new_intercodes();
+                        code1->code.kind = ASSIGN;
+                        code1->code.u.assign.left.kind = VARIABLE;
+                        strcpy(code1->code.u.assign.left.u.var_name, place);
+                        code1->code.u.assign.right.kind = CONSTANT;
+                        code1->code.u.assign.right.u.value = 0;
+                        ir_append(code1);
+                    }
                 } else {
                     ArgsList* tmp = start;
                     while (tmp != NULL) {
@@ -121,13 +154,24 @@ Type* translate_exp(TreeNode* c, char* place) {
                     InterCodes* code1 = new_intercodes();
                     code1->code.kind = READ;
                     code1->code.u.op.kind = NAME;
-                    strcpy(code1->code.u.op.u.var_name, place);
+                    if (place != NULL) {
+                        strcpy(code1->code.u.op.u.var_name, place);
+                    } else {
+                        char t1[15];
+                        new_temp(t1);
+                        strcpy(code1->code.u.op.u.var_name, t1);
+                    }
                     ir_append(code1);
                 } else {
                     InterCodes* code1 = new_intercodes();
                     code1->code.kind = CALL;
                     code1->code.u.call.result.kind = NAME;
-                    strcpy(code1->code.u.call.result.u.var_name, place);
+                    if (place != NULL) strcpy(code1->code.u.call.result.u.var_name, place);
+                    else {
+                        char t1[15];
+                        new_temp(t1);
+                        strcpy(code1->code.u.call.result.u.var_name, t1);
+                    }
                     code1->code.u.call.f.kind = NAME;
                     strcpy(code1->code.u.call.f.u.var_name, c->left->nodeval.type_str);
                     ir_append(code1);
@@ -135,6 +179,22 @@ Type* translate_exp(TreeNode* c, char* place) {
             }
             return int_type;
         }
+    }
+    if (strcmp(c->left->node_type, "MINUS") == 0) {
+        char t1[15];
+        new_temp(t1);
+        Type* type1 = translate_exp(c->left->right, t1);
+        InterCodes* code1 = new_intercodes();
+        code1->code.kind = SUB;
+        code1->code.u.binop.result.kind = VARIABLE;
+        if (place != NULL) strcpy(code1->code.u.binop.result.u.var_name, place);
+        else strcpy(code1->code.u.binop.result.u.var_name, t1);
+        code1->code.u.binop.op1.kind = CONSTANT;
+        code1->code.u.binop.op1.u.value = 0;
+        code1->code.u.binop.op2.kind = VARIABLE;
+        strcpy(code1->code.u.binop.op2.u.var_name, t1);
+        ir_append(code1);
+        return int_type;
     }
     if (strcmp(c->left->right->node_type, "ASSIGNOP") == 0) {
         if (strcmp(c->left->left->node_type, "ID") == 0) {
@@ -146,7 +206,7 @@ Type* translate_exp(TreeNode* c, char* place) {
                 InterCodes* code1 = new_intercodes();
                 code1->code.kind = ASSIGN;
                 code1->code.u.assign.left.kind = NAME;
-                sprintf(code1->code.u.assign.left.u.var_name, "v_%s", c->left->right->nodeval.type_str);
+                sprintf(code1->code.u.assign.left.u.var_name, "v_%s", c->left->left->nodeval.type_str);
                 code1->code.u.assign.right.kind = NAME;
                 strcpy(code1->code.u.assign.right.u.var_name, t1);
                 ir_append(code1);
@@ -156,7 +216,7 @@ Type* translate_exp(TreeNode* c, char* place) {
                     code1->code.u.assign.left.kind = NAME;
                     strcpy(code1->code.u.assign.left.u.var_name, place);
                     code1->code.u.assign.right.kind = NAME;
-                    sprintf(code1->code.u.assign.right.u.var_name, "v_%s", c->left->right->nodeval.type_str);
+                    sprintf(code1->code.u.assign.right.u.var_name, "v_%s", c->left->left->nodeval.type_str);
                     ir_append(code1);
                 }
                 return int_type;
@@ -220,7 +280,7 @@ Type* translate_exp(TreeNode* c, char* place) {
                     strcpy(code1->code.u.assign.right.u.var_name, t2);
                     ir_append(code1);
                 }
-                if (place == NULL) {
+                if (place != NULL) {
                     code1 = new_intercodes();
                     code1->code.kind = ASSIGN;
                     code1->code.u.assign.left.kind = NAME;
@@ -243,24 +303,43 @@ Type* translate_exp(TreeNode* c, char* place) {
             }
             FieldList* f = t->u.structure.first;
             int offset = 0;
-            while (f != NULL && (f->name, c->left->left->right->right->nodeval.type_str)) {
+            while (f != NULL && strcmp(f->name, c->left->left->right->right->nodeval.type_str)) {
                 offset += type_size(f->type);
                 f= f->tail;
             }
             offset = offset * 4;
             if (f == NULL) {
-                printf("error\n");
+                printf("error1\n");
                 return t;
             }
             InterCodes* code1 = new_intercodes();
             code1->code.kind = ADD;
             code1->code.u.binop.result.kind = NAME;
-            strcpy(code1->code.u.binop.result.u.var_name, place);
+            strcpy(code1->code.u.binop.result.u.var_name, t1);
             code1->code.u.binop.op1.kind = NAME;
-            strcpy(code1->code.u.binop.op1.u.var_name, place);
+            strcpy(code1->code.u.binop.op1.u.var_name, t1);
             code1->code.u.binop.op2.kind = CONSTANT;
             code1->code.u.binop.op2.u.value = offset;
             ir_append(code1);
+            char t2[15];
+            new_temp(t2);
+            Type* tmptype = translate_exp(c->left->right->right, t2);
+            code1 = new_intercodes();
+            code1->code.kind = ASSIGN;
+            code1->code.u.assign.left.kind = ADDRESS;
+            strcpy(code1->code.u.assign.left.u.var_name, t1);
+            code1->code.u.assign.right.kind = VARIABLE;
+            strcpy(code1->code.u.assign.right.u.var_name, t2);
+            ir_append(code1);
+            if (place != NULL) {
+                code1 = new_intercodes();
+                code1->code.kind = ASSIGN;
+                code1->code.u.assign.left.kind = VARIABLE;
+                strcpy(code1->code.u.assign.left.u.var_name, place);
+                code1->code.u.assign.right.kind = VARIABLE;
+                strcpy(code1->code.u.assign.right.u.var_name, t2);
+                ir_append(code1);
+            }
             return f->type;
         }
         if (strcmp(c->left->left->right->node_type, "LB") == 0) {
@@ -271,28 +350,66 @@ Type* translate_exp(TreeNode* c, char* place) {
             char t2[15];
             new_temp(t2);
             Type* type2 = translate_exp(c->left->left->right->right, t2);
-            if (type2->kind == BASIC) {
-                InterCodes* code1 = new_intercodes();
+            char t3[15];
+            new_temp(t3);
+            Type* type3 = translate_exp(c->left->right->right, t3);
+            if (type2->kind != BASIC) {
+                printf("error\n");
+                return type1->u.array.elem;
+            }
+            InterCodes* code1 = new_intercodes();
+            code1->code.kind = MUL;
+            code1->code.u.binop.result.kind = VARIABLE;
+            strcpy(code1->code.u.binop.result.u.var_name, t2);
+            code1->code.u.binop.op1.kind = VARIABLE;
+            strcpy(code1->code.u.binop.op1.u.var_name, t2);
+            code1->code.u.binop.op2.kind = CONSTANT;
+            code1->code.u.binop.op2.u.value = 4 * type_size(type1->u.array.elem);
+            ir_append(code1);
+            code1 = new_intercodes();
+            code1->code.kind = ADD;
+            code1->code.u.binop.result.kind = VARIABLE;
+            strcpy(code1->code.u.binop.result.u.var_name, t1);
+            code1->code.u.binop.op1.kind = VARIABLE;
+            strcpy(code1->code.u.binop.op1.u.var_name, t1);
+            code1->code.u.binop.op2.kind = VARIABLE;
+            strcpy(code1->code.u.binop.op2.u.var_name, t2);
+            ir_append(code1);
+            if (type1->u.array.elem->kind == BASIC) {
+                if (type3->kind != BASIC) {
+                    printf("error\n");
+                    return type1->u.array.elem;
+                }
+                code1 = new_intercodes();
                 code1->code.kind = ASSIGN;
                 code1->code.u.assign.left.kind = ADDRESS;
                 strcpy(code1->code.u.assign.left.u.var_name, t1);
                 code1->code.u.assign.right.kind = NAME;
-                strcpy(code1->code.u.assign.right.u.var_name, t2);
+                strcpy(code1->code.u.assign.right.u.var_name, t3);
                 ir_append(code1);
-            } else {
-                char t3[15];
                 if (place != NULL) {
-                    new_temp(t3);
+                    code1 = new_intercodes();
+                    code1->code.kind = ASSIGN;
+                    code1->code.u.assign.left.kind = VARIABLE;
+                    strcpy(code1->code.u.assign.left.u.var_name, place);
+                    code1->code.u.assign.right.kind = VARIABLE;
+                    strcpy(code1->code.u.assign.right.u.var_name, t3);
+                    ir_append(code1);
+                }
+            } else {
+                char t4[15];
+                if (place != NULL) {
+                    new_temp(t4);
                     InterCodes* code1 = new_intercodes();
                     code1->code.kind = ASSIGN;
                     code1->code.u.assign.left.kind = NAME;
-                    strcpy(code1->code.u.assign.left.u.var_name, t3);
+                    strcpy(code1->code.u.assign.left.u.var_name, t4);
                     code1->code.u.assign.right.kind = NAME;
                     strcpy(code1->code.u.assign.right.u.var_name, t1);
                     ir_append(code1);
                 }
                 int size1 = type_size(type1);
-                int size2 = type_size(type2);
+                int size2 = type_size(type3);
                 int num = size1 < size2 ? size1 : size2;
                 for (int i = 0; i < num; ++i) {
                     if (i != 0) {
@@ -310,9 +427,9 @@ Type* translate_exp(TreeNode* c, char* place) {
                         code1 = new_intercodes();
                         code1->code.kind = ADD;
                         code1->code.u.binop.result.kind = NAME;
-                        strcpy(code1->code.u.binop.result.u.var_name, t2);
+                        strcpy(code1->code.u.binop.result.u.var_name, t3);
                         code1->code.u.binop.op1.kind = NAME;
-                        strcpy(code1->code.u.binop.op1.u.var_name, t2);
+                        strcpy(code1->code.u.binop.op1.u.var_name, t3);
                         code1->code.u.binop.op2.kind = CONSTANT;
                         code1->code.u.binop.op2.u.value = 4;
                         ir_append(code1);
@@ -322,7 +439,7 @@ Type* translate_exp(TreeNode* c, char* place) {
                     code1->code.u.assign.left.kind = ADDRESS;
                     strcpy(code1->code.u.assign.left.u.var_name, t1);
                     code1->code.u.assign.right.kind = ADDRESS;
-                    strcpy(code1->code.u.assign.right.u.var_name, t2);
+                    strcpy(code1->code.u.assign.right.u.var_name, t3);
                     ir_append(code1);
                 }
                 if (place != NULL) {
@@ -331,11 +448,11 @@ Type* translate_exp(TreeNode* c, char* place) {
                     code1->code.u.assign.left.kind = NAME;
                     strcpy(code1->code.u.assign.left.u.var_name, place);
                     code1->code.u.assign.right.kind = NAME;
-                    strcpy(code1->code.u.assign.right.u.var_name, t3);
+                    strcpy(code1->code.u.assign.right.u.var_name, t4);
                     ir_append(code1);
                 }
-                return type1;
             }
+            return type1->u.array.elem;
         }
     }
     if (strcmp(c->left->right->node_type, "PLUS") == 0 || strcmp(c->left->right->node_type, "MINUS") == 0
@@ -346,7 +463,7 @@ Type* translate_exp(TreeNode* c, char* place) {
         new_temp(t2);
         Type* type1 = translate_exp(c->left, t1);
         Type* type2 = translate_exp(c->left->right->right, t2);
-        if (type1->kind != BASIC || type2->kind != BASIC || place == NULL) {
+        if (type1->kind != BASIC || type2->kind != BASIC) {
             printf("error type1:%d\n", type1->kind);
             return type1;
         }
@@ -356,7 +473,13 @@ Type* translate_exp(TreeNode* c, char* place) {
         if (strcmp(c->left->right->node_type, "STAR") == 0) code1->code.kind = MUL;
         if (strcmp(c->left->right->node_type, "DIV") == 0) code1->code.kind = DIV;
         code1->code.u.binop.result.kind = NAME;
-        strcpy(code1->code.u.binop.result.u.var_name, place);
+        if (place != NULL) {
+            strcpy(code1->code.u.binop.result.u.var_name, place);
+        } else {
+            char t3[15];
+            new_temp(t3);
+            strcpy(code1->code.u.binop.result.u.var_name, t3);
+        }
         code1->code.u.binop.op1.kind = NAME;
         strcpy(code1->code.u.binop.op1.u.var_name, t1);
         code1->code.u.binop.op2.kind = NAME;
@@ -368,22 +491,26 @@ Type* translate_exp(TreeNode* c, char* place) {
     || strcmp(c->left->right->node_type, "AND") == 0 || strcmp(c->left->right->node_type, "OR") == 0) {
         InterCodes* label1 = new_label();
         InterCodes* label2 = new_label();
-        InterCodes* code0 = new_intercodes();
-        code0->code.kind = ASSIGN;
-        code0->code.u.assign.left.kind = NAME;
-        strcpy(code0->code.u.assign.left.u.var_name, place);
-        code0->code.u.assign.right.kind = CONSTANT;
-        code0->code.u.assign.right.u.value = 0;
-        ir_append(code0);
+        if (place != NULL) {
+            InterCodes* code0 = new_intercodes();
+            code0->code.kind = ASSIGN;
+            code0->code.u.assign.left.kind = NAME;
+            strcpy(code0->code.u.assign.left.u.var_name, place);
+            code0->code.u.assign.right.kind = CONSTANT;
+            code0->code.u.assign.right.u.value = 0;
+            ir_append(code0);
+        }
         translate_cond(c, label1->code.u.op.u.var_name, label2->code.u.op.u.var_name);
         ir_append(label1);
-        InterCodes* code1 = new_intercodes();
-        code1->code.kind = ASSIGN;
-        code1->code.u.assign.left.kind = NAME;
-        strcpy(code1->code.u.assign.left.u.var_name, place);
-        code1->code.u.assign.right.kind = CONSTANT;
-        code1->code.u.assign.right.u.value = 1;
-        ir_append(code1);
+        if (place != NULL) {
+            InterCodes* code1 = new_intercodes();
+            code1->code.kind = ASSIGN;
+            code1->code.u.assign.left.kind = NAME;
+            strcpy(code1->code.u.assign.left.u.var_name, place);
+            code1->code.u.assign.right.kind = CONSTANT;
+            code1->code.u.assign.right.u.value = 1;
+            ir_append(code1);
+        }
         ir_append(label2);
         return int_type;
     }
@@ -416,13 +543,15 @@ Type* translate_exp(TreeNode* c, char* place) {
         strcpy(code1->code.u.binop.op2.u.var_name, t2);
         ir_append(code1);
         code1 = new_intercodes();
-        code1->code.kind = ASSIGN;
-        code1->code.u.assign.left.kind = NAME;
-        strcpy(code1->code.u.assign.left.u.var_name, place);
-        if (type1->u.array.elem->kind == BASIC) code1->code.u.assign.right.kind = ADDRESS;
-        else code1->code.u.assign.right.kind = NAME;
-        strcpy(code1->code.u.assign.right.u.var_name, t1);
-        ir_append(code1);
+        if (place != NULL) {
+            code1->code.kind = ASSIGN;
+            code1->code.u.assign.left.kind = NAME;
+            strcpy(code1->code.u.assign.left.u.var_name, place);
+            if (type1->u.array.elem->kind == BASIC) code1->code.u.assign.right.kind = ADDRESS;
+            else code1->code.u.assign.right.kind = NAME;
+            strcpy(code1->code.u.assign.right.u.var_name, t1);
+            ir_append(code1);
+        }
         return type1->u.array.elem;
     }
     if (strcmp(c->left->right->node_type, "DOT") == 0) {
@@ -448,14 +577,16 @@ Type* translate_exp(TreeNode* c, char* place) {
         code1->code.u.binop.op2.kind = CONSTANT;
         code1->code.u.binop.op2.u.value = offset * 4;
         ir_append(code1);
-        code1 = new_intercodes();
-        code1->code.kind = ASSIGN;
-        code1->code.u.assign.left.kind = NAME;
-        strcpy(code1->code.u.assign.left.u.var_name, place);
-        if (f->type->kind == BASIC) code1->code.u.assign.right.kind = ADDRESS;
-        else code1->code.u.assign.right.kind = NAME;
-        strcpy(code1->code.u.assign.right.u.var_name, t1);
-        ir_append(code1);
+        if (place != NULL) {
+            code1 = new_intercodes();
+            code1->code.kind = ASSIGN;
+            code1->code.u.assign.left.kind = NAME;
+            strcpy(code1->code.u.assign.left.u.var_name, place);
+            if (f->type->kind == BASIC) code1->code.u.assign.right.kind = ADDRESS;
+            else code1->code.u.assign.right.kind = NAME;
+            strcpy(code1->code.u.assign.right.u.var_name, t1);
+            ir_append(code1);
+        }
         return f->type;
     }
 }
@@ -477,7 +608,7 @@ ArgsList* translate_args(TreeNode* c, ArgsList* l) {
 
 void translate_cond(TreeNode* c, char* label_true, char* label_false) {
     if (strcmp(c->left->node_type, "NOT") == 0) {
-        return translate_cond(c, label_false, label_true);
+        return translate_cond(c->left->right, label_false, label_true);
     }
     if (c->left->right != NULL && strcmp(c->left->right->node_type, "RELOP") == 0) {
         char t1[15], t2[15];
@@ -505,22 +636,14 @@ void translate_cond(TreeNode* c, char* label_true, char* label_false) {
     if (c->left->right != NULL && strcmp(c->left->right->node_type, "AND") == 0) {
         InterCodes* label1 = new_label();
         translate_cond(c->left, label1->code.u.op.u.var_name, label_false);
-        InterCodes* code1 = new_intercodes();
-        code1->code.kind = GOTO;
-        code1->code.u.op.kind = NAME;
-        strcpy(code1->code.u.op.u.var_name,label1->code.u.op.u.var_name);
-        ir_append(code1);
+        ir_append(label1);
         translate_cond(c->left->right->right, label_true, label_false);
         return;
     }
     if (c->left->right != NULL && strcmp(c->left->right->node_type, "OR") == 0) {
         InterCodes* label1 = new_label();
         translate_cond(c->left, label_true, label1->code.u.op.u.var_name);
-        InterCodes* code1 = new_intercodes();
-        code1->code.kind = GOTO;
-        code1->code.u.op.kind = NAME;
-        strcpy(code1->code.u.op.u.var_name,label1->code.u.op.u.var_name);
-        ir_append(code1);
+        ir_append(label1);
         translate_cond(c->left->right->right, label_true, label_false);
         return;
     }
@@ -616,7 +739,7 @@ void translate_compst(TreeNode* c) {
                             ir_append(code1);
                         }
                     }
-                } else {    
+                } else {
                     if (dec_c->left->right != NULL) {
                         char t1[15];
                         new_temp(t1);
@@ -640,16 +763,17 @@ void translate_compst(TreeNode* c) {
         } else {
             //结构体不可以直接赋值
             TreeNode* strspec_c = def_c->left->left;
-            Type* type1 = specifier_process(strspec_c);
+            Type* type1 = specifier_process(def_c->left);
             TreeNode* dec_c = def_c->left->right->left;
             while (1) {
                 TreeNode* vardec_c = dec_c->left;
                 if (strcmp(vardec_c->left->node_type, "ID") == 0) {
+                    // printf("?????\n");
                     InterCodes* code1 = new_intercodes();
                     code1->code.kind = DEC;
                     code1->code.u.dec.param.kind = NAME;
                     sprintf(code1->code.u.dec.param.u.var_name, "v_%s", vardec_c->left->nodeval.type_str);
-                    code1->code.u.dec.size = type_size(type1);
+                    code1->code.u.dec.size = type_size(type1) * 4;
                     ir_append(code1);
                     Symbol* s = (Symbol*) malloc(sizeof(Symbol));
                     symbol_init(s);
@@ -674,7 +798,7 @@ void translate_compst(TreeNode* c) {
         deflist_c = deflist_c->left->right;
     }
 
-    while (stmtlist_c != NULL) {
+    while (stmtlist_c->left != NULL) {
         translate_stmt(stmtlist_c->left);
         stmtlist_c = stmtlist_c->left->right;
     }
@@ -691,7 +815,6 @@ void translate_stmt(TreeNode* c) {
     }
     if (strcmp(c->left->node_type, "IF") == 0) {
         if (c->left->right->right->right->right->right == NULL) {
-            printf("if\n");
             InterCodes* label1 = new_label();
             InterCodes* label2 = new_label();
             translate_cond(c->left->right->right, label1->code.u.op.u.var_name, label2->code.u.op.u.var_name);
@@ -699,15 +822,12 @@ void translate_stmt(TreeNode* c) {
             translate_stmt(c->left->right->right->right->right);
             ir_append(label2);
         } else {
-            printf("if else\n");
             InterCodes* label1 = new_label();
             InterCodes* label2 = new_label();
             InterCodes* label3 = new_label();
             translate_cond(c->left->right->right, label1->code.u.op.u.var_name, label2->code.u.op.u.var_name);
-            printf("after cond\n");
             ir_append(label1);
             translate_stmt(c->left->right->right->right->right);
-            printf("after stmt\n");
             InterCodes* code1 = new_intercodes();
             code1->code.kind =GOTO;
             code1->code.u.op.kind = NAME;
@@ -736,7 +856,7 @@ void translate_stmt(TreeNode* c) {
         return;
     }
     if (strcmp(c->left->node_type, "RETURN") == 0) {
-        printf("return\n");
+        // printf("return\n");
         char t1[15];
         new_temp(t1);
         Type* type1 = translate_exp(c->left->right, t1);
@@ -772,7 +892,7 @@ void ir_append(InterCodes* ir) {
         ir->pre = ir_now;
         ir_now = ir;
     }
-    print_test(ir);
+    // print_test(ir);
 }
 
 InterCodes* new_intercodes() {
@@ -807,10 +927,10 @@ int type_size(Type* t) {
 
 int get_relop(TreeNode* c) {
     if (strcmp(c->nodeval.type_str, "==") == 0) return 0;
-    if (strcmp(c->nodeval.type_str, ">") == 0) return 1;
-    if (strcmp(c->nodeval.type_str, "<") == 0) return 2;
-    if (strcmp(c->nodeval.type_str, ">=") == 0) return 3;
-    if (strcmp(c->nodeval.type_str, "<=") == 0) return 4;
+    if (strcmp(c->nodeval.type_str, "<") == 0) return 1;
+    if (strcmp(c->nodeval.type_str, ">") == 0) return 2;
+    if (strcmp(c->nodeval.type_str, "<=") == 0) return 3;
+    if (strcmp(c->nodeval.type_str, ">=") == 0) return 4;
     if (strcmp(c->nodeval.type_str, "!=") == 0) return 5;
 }
 

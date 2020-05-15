@@ -41,9 +41,10 @@ Program: ExtDefList {
     }*/
     if (!err_flag) {
         start_semantics($$);
-        // printf("??????\n");
+        // printf("????\n");
         translate_init();
         start_cal_ir($$);
+        optimize_ir();
     }
 }
     ;
