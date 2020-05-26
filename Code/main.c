@@ -2,6 +2,7 @@
 extern FILE* yyin;
 extern int yylineno;
 extern void print_ir(char* out);
+extern void gen_machine_code(char *out);
 
 int main(int argc, char** argv) {
 	if (argc <= 1) return 1;
@@ -18,5 +19,6 @@ int main(int argc, char** argv) {
 	yyparse();
 	print_ir(argv[2]);
 	// print_ir("out.ir");
+	gen_machine_code(argv[3]);
 	return 0;
 }
