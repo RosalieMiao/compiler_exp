@@ -1,0 +1,11 @@
+int mod(int a, int b) {
+	return a - (a / b) * b;
+}
+
+int main() {
+	int a;
+	a = read();
+	if (mod(a, 400) == 0 || mod(a, 4) == 0 && mod(a, 100) != 0) write(1);
+	else write(0);
+	return 0;
+}

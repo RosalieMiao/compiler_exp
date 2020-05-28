@@ -19,8 +19,10 @@
 
 /* priority level */
 %right  ASSIGNOP
-%left   AND OR NOT
+%left   OR
+%left   AND
 %left   RELOP
+%left   NOT
 %left   PLUS MINUS
 %left   STAR DIV
 %nonassoc   UNMINUS

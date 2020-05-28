@@ -99,8 +99,8 @@ void gen_machine_code(char *out) {
             fprintf(fp, "  addi $sp, $sp, 4\n");
             fprintf(fp, "  lw $fp, 0($sp)\n");
             fprintf(fp, "  addi $sp, $sp, 4\n");
-            operand_code(1, code.u.call.result, fp);
             fprintf(fp, "  move $t1, $v0\n");
+            load_answer(1, code.u.call.result, fp);
             break;
         case READ:
             fprintf(fp, "  addi $sp, $sp, -4\n  sw $ra, 0($sp)\n  jal read\n");
@@ -314,3 +314,4 @@ void variable_init(InterCodes* ic, FILE* fp) {
     // }
     // printf("????????\n");
 }
+

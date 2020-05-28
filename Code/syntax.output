@@ -1793,13 +1793,13 @@ Args <node> (53)
     MINUS  偏移，并进入状态 88
     STAR   偏移，并进入状态 89
     DIV    偏移，并进入状态 90
+    AND    偏移，并进入状态 91
     DOT    偏移，并进入状态 93
     LB     偏移，并进入状态 94
 
     SEMI      使用规则 53 以归约 (Exp)
     COMMA     使用规则 53 以归约 (Exp)
     ASSIGNOP  使用规则 53 以归约 (Exp)
-    AND       使用规则 53 以归约 (Exp)
     OR        使用规则 53 以归约 (Exp)
     RP        使用规则 53 以归约 (Exp)
     RB        使用规则 53 以归约 (Exp)
