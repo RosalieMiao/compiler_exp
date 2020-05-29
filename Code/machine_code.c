@@ -7,12 +7,12 @@ void gen_machine_code(char *out) {
         perror(out);
         return;
     }
-    fprintf(fp, ".data\n_prompt: .asciiz\"Enter an integer:\"\n");
+    fprintf(fp, ".data\n_prompt: .asciiz \"Enter an integer:\"\n");
     fprintf(fp, "_ret: .asciiz \"\\n\"\n.globl main\n.text\nread:\n");
     fprintf(fp, "  li $v0, 4\n  la $a0, _prompt\n  syscall\n");
     fprintf(fp, "  li $v0, 5\n  syscall\n  jr $ra\n\n");
     fprintf(fp, "write:\n  li $v0, 1\n  syscall\n  li $v0, 4\n");
-    fprintf(fp, "  la $a0, 4\n  la $a0, _ret\n  syscall\n");
+    fprintf(fp, "  la $a0, _ret\n  syscall\n");
     fprintf(fp, "  move $v0, $0\n  jr $ra\n");
     InterCodes * ic_tmp = ir_root;
     while (ic_tmp != NULL) {
