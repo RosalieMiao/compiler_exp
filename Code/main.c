@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 	// printf("BBBBBBBBBB\n");
 	yyparse();
 	// print_ir(argv[2]);
-	print_ir("out.ir");
+	// print_ir("out.ir");
 	gen_machine_code(argv[2]);
 	return 0;
 }
